@@ -1,19 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
 export const ThemeSwitcher = () => {
   const [theme, setTheme] = useState<Theme>("light");
 
-  const handleToggle = () => {
+  useEffect(() => {
+    if (!("theme" in localStorage)) {
+      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const nextTheme = isDark ? "dark" : "light";
+      applyTheme(nextTheme);
+    }
     const currentTheme = localStorage.getItem("theme") as Theme;
-    const targetTheme = currentTheme === "dark" ? "light" : "dark";
-    setTheme(targetTheme);
-    localStorage.theme = targetTheme;
-    document.documentElement.classList.toggle("dark", targetTheme === "dark");
+    applyTheme(currentTheme);
+  }, []);
+
+  const applyTheme = (theme: Theme) => {
+    setTheme(theme);
+    localStorage.setItem("theme", theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
   };
+
+  const handleToggle = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    applyTheme(nextTheme);
+  };
+
   return (
     <button aria-label="Toggle Dark Mode" type="button" onClick={handleToggle}>
       <ThemeIcon theme={theme} />
