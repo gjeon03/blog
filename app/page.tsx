@@ -7,11 +7,16 @@ export default function Page() {
         My Portfolio
       </h1>
       <p className="mb-4">
-        {`I'm a Vim enthusiast and tab advocate, finding unmatched efficiency in
-        Vim's keystroke commands and tabs' flexibility for personal viewing
-        preferences. This extends to my support for static typing, where its
-        early error detection ensures cleaner code, and my preference for dark
-        mode, which eases long coding sessions by reducing eye strain.`}
+        Welcome to My Portfolio I'm a Frontend Developer passionate about
+        crafting clean and responsive user interfaces using Next.js. I thrive on
+        building dynamic and performant web applications, focusing on seamless
+        user experiences and maintainable codebases.
+        <br />
+        <br />
+        From exploring modern JavaScript frameworks to optimizing for SEO and
+        accessibility, I enjoy every step of building web applications. Dark
+        mode, static typing, and beautiful design patterns are my trusted tools
+        for a productive development journey.
       </p>
       <div className="my-8">
         <BlogPosts />
