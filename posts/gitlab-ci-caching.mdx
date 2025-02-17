@@ -1,0 +1,1425 @@
+---
+title: "Caching in GitLab CI/CD"
+publishedAt: "2023-03-08"
+summary: "GitLab CI 에서 build Caching 해보기"
+---
+
+프론트엔드 프로젝트에서 gitlab ci cache를 이용해 ci 시간을 줄이고 cache 적용에 다양하게 시도해보기
+
+# GitLab cache 란
+
+- cache는 job이 다운로드하고 저장하는 하나 이상의 파일입니다. 동일한 캐시를 사용하는 후속 작업은 파일을 다시 다운로드할 필요가 없으므로 더 빨리 실행됩니다.
+- 인터넷에서 다운로드하는 패키지와 같은 종속성에 캐시를 사용하는것이 좋습니다.
+- cache는 GitLab Runner가 설치된 곳에 저장되며 **분산 캐시가 활성화 된 경우 S3에 업로드**됩니다.
+- 기본적으로 비활성화 되있으며 사용시 cache 키워드를 이용해 작업별 캐시를 정의합니다.
+- 후속 파이프라인은 캐시를 사용할 수 있습니다.
+- 종속성이 동일한 경우 동일한 파이프라인의 후속 작업에서 캐시를 사용할 수 있습니다.
+- 다른 프로젝트는 캐시를 공유할 수 없습니다.
+- 기본적으로 보호된 분기와 보호되지 않은 분기는 캐시를 공유하지 않습니다.
+  - 모든 분기에 동일한 캐시 사용 - [https://docs.gitlab.com/ee/ci/caching/index.html#use-the-same-cache-for-all-branches](https://docs.gitlab.com/ee/ci/caching/index.html#use-the-same-cache-for-all-branches)
+
+## 고려사항
+
+- 다른 캐시 구성을 사용하는 다른 작업이 동일한 zip 파일에 캐시를 저장한 경우 덮어씁니다. S3 기반의 공유 캐시를 사용하는 경우 파일은 캐시 키를 기반으로 객체에 S3에 추가로 업로드됩니다. 따라서 경로는 다르지만 캐시 키는 동일한 두 작업이 캐시를 덮어씁니다.
+
+# cache 적용하기
+
+들어가기전에 gitlab에서 yarn을 사용하는 프로젝트의 경우 cache 를 적용하는 선택지가 두 가지 존재합니다.
+
+1. node_modules + gitlab ci cache
+   - node_modules 를 cache에 저장합니다.
+2. yarn cache + gitlab ci cache
+   - yarn cache 를 cache에 저장합니다.
+
+gitlab 키워드 - [https://docs.gitlab.com/ee/ci/yaml/index.html](https://docs.gitlab.com/ee/ci/yaml/index.html)
+
+## 1. node_modules
+
+```json
+image: node:16-slim
+
+unit_test:
+  script:
+    - yarn install
+  cache: #<<----------------- 캐시 적용 부분
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules
+    policy: pull-push
+		when: on_success
+```
+
+unit_test 라는 job을 보면 cache 적용 부분이 보입니다.
+
+간단하게 풀이하면
+
+- script
+  - 스크립트 작성 부분으로 캐시 업로드를 하기 위해서는 node_modules가 필요하기 때문에 yarn install을 해줍니다.
+- cache
+  캐시관련 키워드가 지정되는 곳입니다.
+  - key
+    - 캐시의 key 값으로 yarn.lock 파일을 지정했습니다.
+      - yarn.lock 파일이 변경되면 node_modules 파일을 업데이트합니다.
+      - package.json보다 yarn.lock 파일이 버전이 더 세부적으로 나와있기에 yarn.lock 파일로 key값을 정했습니다.
+    - [https://docs.gitlab.com/ee/ci/yaml/index.html#cachekey](https://docs.gitlab.com/ee/ci/yaml/index.html#cachekey)
+  - paths
+    - 캐시할 파일을 node_modules 파일로 지정해 줬습니다.
+    - [https://docs.gitlab.com/ee/ci/yaml/index.html#cachepaths](https://docs.gitlab.com/ee/ci/yaml/index.html#cachepaths)
+  - policy
+    - 업로드 및 가져오기 동작에 관련된 사항입니다.
+      - `pull` - 캐시 파일을 가져옵니다.
+      - `push` - 캐시 파일을 가져오진 않고 업로드만 합니다.
+      - `pull-push`(default) - 가져오기와 업로드를 모두 합니다.
+    - [https://docs.gitlab.com/ee/ci/yaml/index.html#cachepolicy](https://docs.gitlab.com/ee/ci/yaml/index.html#cachepolicy)
+  - when
+    - 작업 상태에 따라 캐시를 저장할 시기를 정의하는 데 사용 합니다.
+      - `on_success`(default) - 작업이 성공한 경우에만 캐시를 저장합니다.
+      - `on_failure` - 작업이 실패한 경우에만 캐시를 저장합니다.
+      - `always` - 항상 캐시를 저장합니다.
+    - [https://docs.gitlab.com/ee/ci/yaml/index.html#cachewhen](https://docs.gitlab.com/ee/ci/yaml/index.html#cachewhen)
+
+> default로 되있는 키워드는 따로 지정을 안해줘도 됩니다.
+
+## 2. yarn cache
+
+```json
+image: node:16-slim
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+
+unit_test:
+  script:
+    - yarn install
+  cache: #<<----------------- 캐시 적용 부분
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull-push
+		when: on_success
+```
+
+node_modules를 캐시하는 부분과 크게 다르진 않습니다.
+
+차이는 variables를 통해 YARN_CACHE_FOLDER 환경변수를 지정해주고 .yarn-cache 파일을 cache 한다는 부분만 다릅니다.
+
+그럼 yarn cache란 무엇인가?
+
+## yarn cache란?
+
+[Yarn](https://classic.yarnpkg.com/lang/en/docs/cli/cache/)
+
+Yarn은 파일 시스템의 사용자 디렉터리에 있는 글로벌 캐시에 모든 패키지를 저장합니다.
+
+yarn은 따로 지정을 안해줘도 yarn을 사용하면 자동적으로 캐시파일이 생성되고 있었습니다. 확인하는 방법은
+
+- **`yarn cache dir`** - \*\*\*\*입력시 글로벌 캐시의 위치가 나오는데 그게 v6를 가리킨다.
+  - `/Users/gyeongyeon-jeon/Library/Caches/Yarn/v6`
+
+이걸 gitlab에서 사용하는 과정을 간단하게 말하면 기존에는 따로 경로를 지정 안해줘서 글로벌 캐시에 저장되고 있던걸 프로젝트 디렉토리로 경로를 지정해줘서 프로젝트 내에 저장 시키고 사용을 하는것입니다.
+
+좀 더 자세히 보면 저는 처음에 gitlab 문서를 보면서 yarn cache 를 사용하는데 왜 환경변수를 사용해야 되는거고 .yarn-cache 라는 명칭은 어디서 갑자기 생겨난거지? 싶었습니다.
+그런데 **.yarn-cache는 사용자가 직접 명칭을 정해주는 것이고 굳이 다른 이름이여도 상관이 없었습니다.**
+
+yarn cache 사용
+
+1. `yarn config set cache-folder <path>`
+2. `yarn <command> --cache-folder <path>`
+3. `YARN_CACHE_FOLDER=<path> yarn <command>`
+
+로컬에서 테스트를 해보면 위의 세가지 방법중 하나를 사용하면서 install을 해주고 path 부분에 사용하고 싶은 캐시 폴더 명을 적으면 됩니다.
+
+예를 들어
+
+`yarn install --cache-folder .yarn-cache` 라고 입력시 yarn install을 하며 cache 폴더가 .yarn-cache로 프로젝트 내에 생깁니다.
+
+또는 `YARN_CACHE_FOLDER=.yarn-cache yarn install` 라고 환경변수를 지정해주고 yarn install 을 하면 위와 동일하게 cache 폴더가 .yarn-cache로 프로젝트 내에 생깁니다.
+
+위처럼 한다면 프로젝트 내에 생긴 .yarn-cache 파일을 gitlab cache 파일로 지정을 해주고 동시에 yarn install시 사용할 파일도 프로젝트 내의 .yarn-cache 파일로 지정할 수 있습니다.
+
+> **YARN_CACHE_FOLDER**
+>
+> [https://github.com/yarnpkg/yarn/issues/3208](https://github.com/yarnpkg/yarn/issues/3208)
+>
+> 환경변수로 YARN_CACHE_FOLDER 선언을 해주면 기본 캐시 디렉터리보다 우선시 합니다.
+> 하지만, --cache-folder 처럼 명령줄에 사용되는 옵션보다 우선하지는 않습니다.
+
+### 그럼 yarn cache는 왜 gitlab ci 에서 프로젝트 내에 만들어 사용해야 하는가?
+
+[Caching in GitLab CI/CD | GitLab](https://docs.gitlab.com/ee/ci/caching/#how-cache-is-different-from-artifacts)
+
+gitlab 문서를 보면
+Both artifacts and caches define their paths relative to the project directory, and can’t link to files outside it.
+라고 나와있습니다.
+
+번역하면, **아티팩트와 캐시는 모두 프로젝트 디렉터리에 상대적인 경로를 정의하며 외부 파일에 연결할 수 없습니다.**
+이처럼 외부파일에 연결할 수 없기에 캐시파일을 프로젝트 내로 가져오고 캐시 적용도 프로젝트 내의 파일로 지정을 해줘야됩니다.
+
+# yarn cache VS node_modules cache
+
+저는 이 두 가지를 모두 테스트 해보면서 뭐가 더 나을까 고민을 하였습니다.
+
+### 1. `node_modules`
+
+### yarn install 시간 테스트
+
+- Clear runner caches : 70.89s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    # YARN_CACHE_FOLDER: .yarn-cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -alh
+      - echo "node_module 테스트"
+      - yarn cache dir
+      - export
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - node_modules
+      policy: pull-push
+  ```
+
+  ![node_modules_test01.png](/posts/gitlab-ci-caching/node_modules_test01.png)
+
+- 1차 : 0.80s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    # YARN_CACHE_FOLDER: .yarn-cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -alh
+      - echo "node_module 1차 테스트"
+      - yarn cache dir
+      - export
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - node_modules
+      policy: pull-push
+  ```
+
+  ![node_modules_test02.png](/posts/gitlab-ci-caching/node_modules_test02.png)
+
+- 2차 : 0.68s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    # YARN_CACHE_FOLDER: .yarn-cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -alh
+      - echo "node_module 2차 테스트"
+      - yarn cache dir
+      - export
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - node_modules
+      policy: pull-push
+  ```
+
+  ![node_modules_test03.png](/posts/gitlab-ci-caching/node_modules_test03.png)
+
+- Clear runner caches : 72.48s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    # YARN_CACHE_FOLDER: .yarn-cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -alh
+      - echo "node_module Clear runner caches "
+      - yarn cache dir
+      - export
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - node_modules
+      policy: pull-push
+  ```
+
+  ![node_modules_test04.png](/posts/gitlab-ci-caching/node_modules_test04.png)
+
+- 3차 : 0.74s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    # YARN_CACHE_FOLDER: .yarn-cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -alh
+      - echo "node_module 3차 테스트"
+      - yarn cache dir
+      - export
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - node_modules
+      policy: pull-push
+  ```
+
+  ![node_modules_test05.png](/posts/gitlab-ci-caching/node_modules_test05.png)
+
+### build
+
+27.80s
+
+### 사이즈
+
+![node_modules_build_test01.png](/posts/gitlab-ci-caching/node_modules_build_test01.png)
+
+775M
+
+### 폴더 수
+
+![node_modules_build_test02.png](/posts/gitlab-ci-caching/node_modules_build_test02.png)
+
+734개
+
+### 2. `yarn cache`
+
+### yarn install 시간 테스트
+
+- 1차 : 13.55s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    YARN_CACHE_FOLDER: .yarn_cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -al
+      - ls -al .cache
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - .yarn_cache/
+      policy: pull-push
+  ```
+
+  ![yarn_cache_test01.png](/posts/gitlab-ci-caching/yarn_cache_test01.png)
+
+  ![yarn_cache_test02.png](/posts/gitlab-ci-caching/yarn_cache_test02.png)
+  .cache 디렉토리를 보면 v6라고 있습니다.
+  YARN_CACHE_FOLDER : .cache 로 환경변수를 선언해주면 자동으로 v6를 바라보고 yarn cache 적용을 해줍니다.
+
+- 2차 : 13.70s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    YARN_CACHE_FOLDER: .cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -al
+      - ls -al .cache
+      - echo "2차 테스트"
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - .cache/
+      policy: pull-push
+  ```
+
+  ![yarn_cache_test03.png](/posts/gitlab-ci-caching/yarn_cache_test03.png)
+
+- Clear runner caches : 52.37s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    YARN_CACHE_FOLDER: .cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -al
+      - ls -al .cache
+      - echo "Clear runner caches"
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - .cache/
+      policy: pull-push
+  ```
+
+  ![yarn_cache_test04.png](/posts/gitlab-ci-caching/yarn_cache_test04.png)
+
+- 3차 : 19.59s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    YARN_CACHE_FOLDER: .cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -al
+      - ls -al .cache
+      - echo "3차 테스트!"
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - .cache/
+      policy: pull-push
+  ```
+
+  ![yarn_cache_test05.png](/posts/gitlab-ci-caching/yarn_cache_test05.png)
+
+- 4차 : 20.03s
+
+  ```json
+  image: node:16-slim
+
+  stages:
+    - test
+    - build
+
+  variables:
+    YARN_CACHE_FOLDER: .cache
+
+  unit_test:
+    stage: test
+    only:
+      - merge_requests
+      - main
+    script:
+      - yarn install
+      - ls -al
+      - ls -al .cache
+      - echo "4차 테스트!"
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - .cache/
+      policy: pull-push
+  ```
+
+  ![yarn_cache_test06.png](/posts/gitlab-ci-caching/yarn_cache_test06.png)
+
+### build
+
+26.67s
+
+### 사이즈
+
+![yarn_cache_build_test01.png](/posts/gitlab-ci-caching/yarn_cache_build_test01.png)
+
+2.1G
+
+### 폴더 수
+
+![yarn_cache_build_test02.png](/posts/gitlab-ci-caching/yarn_cache_build_test02.png)
+
+1028개
+
+Clear runner caches 는 gitlab에 저장되있는 캐시를 삭제하고 테스트를 했을 때 발생한 시간입니다.
+
+시간을 보면 node_modules을 캐시했을때가 더 빠른것을 볼 수 있는데, 이는 yarn 이 참고하는 cache 파일은 node_modules의 라이브러리들이 압축된 형식으로 보관되고 있어 yarn intall을 하면 cache 를 이용해 node_modules 를 생성하여 더 오래 걸렸습니다.
+
+- yarn install 시간 : node_modules > yarn cache
+- build 시간 : node_modules = yarn cache (거의 비등)
+- 사이즈 : node_modules < yarn cache
+- 폴더 수 : node_modules < yarn cache
+
+솔직히 처음에 테스트를 하기전에는 막연하게 yarn cache가 더 빠를줄 알았습니다. 근데 테스트를 해보니 왜 yarn cache를 사용하지? 싶었습니다.
+
+그리고 사이즈에서 차이가 너무 심해서 찾아보니 아래와 같이 나와있었습니다.
+
+> Yarn은 기본적으로 다운로드하는 패키지(다른 버전 포함)를 캐시합니다. `yarn install`이 캐시를 삭제하면 필요한 패키지를 다시 가져와야 하기 때문에 실행하는 데 시간이 더 오래 걸릴 수 있다는 주요 부작용이 나타납니다 .
+> [https://stackoverflow.com/questions/67429900/yarn-cache-size-on-mac-os-too-big](https://stackoverflow.com/questions/67429900/yarn-cache-size-on-mac-os-too-big)
+
+yarn cache 관련해서 이슈도 있었습니다.
+
+[https://github.com/yarnpkg/yarn/issues/6037](https://github.com/yarnpkg/yarn/issues/6037)
+
+### 어떨때 yarn cache를 사용하지?
+
+개인적인 생각으로는 ci에서의 사용은 yarn의 offline mirror 기능을 사용해서 캐시된 파일을 이용해 offline에서 node_modules를 만들 수 있게 하는 부분에 사용하는거 아닐까 생각이 듭니다.
+
+- yarn offline mirror
+  - 사용방법 - [https://classic.yarnpkg.com/blog/2016/11/24/offline-mirror/](https://classic.yarnpkg.com/blog/2016/11/24/offline-mirror/)
+  - 불필요한 tarball제거 - [https://classic.yarnpkg.com/en/docs/prune-offline-mirror](https://classic.yarnpkg.com/en/docs/prune-offline-mirror)
+  - gitlab ci offline mirror - [https://docs.gitlab.com/ee/ci/caching/#compute-the-cache-key-from-the-lock-file](https://docs.gitlab.com/ee/ci/caching/#compute-the-cache-key-from-the-lock-file)
+  - yarn v2 - [https://yarnpkg.com/features/offline-cache](https://yarnpkg.com/features/offline-cache)
+    오프라인 캐시는 고용주가 공과금을 지불하지 않았거나 패키지가 호스팅되는 장소를 사용할 수 없게 되었기 때문에 어떤 이유로든 **네트워크가 다운된 경우에도 Yarn이 제대로 작동할 수 있도록 하는 기능 입니다.**
+  - 참고 - [https://medium.com/slackernoon/speed-up-ci-builds-with-npm-offline-cache-aa72a2bb63c5](https://medium.com/slackernoon/speed-up-ci-builds-with-npm-offline-cache-aa72a2bb63c5)
+
+> **이점**
+>
+> - As you know, all packages will be stored node_modules directory in npm. If you’ve deleted your node_modules folder for any reason and run npm install in the project console, npm will re-download each and every package along with their dependencies, which in itself is not required and takes up too much of your time.
+> - NPM always installs each dependency one after the other which might end up using a lot of time. I used to take small walk after running npm install :). Why can’t npm client parallelize the downloads?
+>
+> [https://www.atatus.com/blog/everything-you-wanted-to-know-about-yarn-package-manager/](https://www.atatus.com/blog/everything-you-wanted-to-know-about-yarn-package-manager/)
+
+여러가지를 찾아봐도 로컬에서의 이점이지 도커를 사용한 ci 환경에서 이점이 될 수 있을까?? 싶습니다.
+
+그러면 yarn offline mirror 기능을 사용하면 더 빠른가?
+
+### yarn
+
+![yarn_online01.png](/posts/gitlab-ci-caching/yarn_online01.png)
+
+![yarn_online02.png](/posts/gitlab-ci-caching/yarn_online02.png)
+
+![yarn_online03.png](/posts/gitlab-ci-caching/yarn_online03.png)
+
+### yarn offline mirror
+
+![yarn_offline01.png](/posts/gitlab-ci-caching/yarn_offline01.png)
+
+![yarn_offline02.png](/posts/gitlab-ci-caching/yarn_offline02.png)
+
+![yarn_offline03.png](/posts/gitlab-ci-caching/yarn_offline03.png)
+
+차이가 크게 없습니다.
+
+### 어떤걸 사용하지?
+
+수치상으로만 보면 node_modules 를 캐시하겠지만
+
+- `node_modules`참고: 캐시는 노드 버전 간에 중단될 수 있고 작동하지 않으므로 캐시하지 않는 것이 좋습니다.
+  [https://github.com/actions/cache/blob/611465405cc89ab98caca2c42504d9289fb5f22e/examples.md#node---npm](https://github.com/actions/cache/blob/611465405cc89ab98caca2c42504d9289fb5f22e/examples.md#node---npm)
+
+이와 같은 글을 보았는데 github actions에 관한 글이지 gitlab ci 에서 s3 저장하는 캐시에 관련된 글은 아닌것 같아 확실한 정보인지는 모르겠습니다.
+
+일단은 적용을 시키는것에는 두 개가 큰 차이가 없어 yarn cache를 이용해 적용하는것에 중점을 두었습니다.
+
+# 최적화
+
+캐시하는 방법을 알았으니 이제 이걸 어떻게 최적화를 해줘야될까 생각했습니다.
+
+```json
+cache:
+  key:
+    files:
+      - yarn.lock
+  paths:
+    - .yarn-cache/
+  policy: pull-push
+	when: on_success
+```
+
+먼저 눈여겨 볼건 policy입니다. default 값 pull-push로 되있는데 캐시된 파일을 가져오는것도 업로드 하는것도 다 시간이 소요됩니다.
+
+이걸 필요할때는 pull로 불러오기만하고 캐시된 파일을 업데이트 해줘야할때만 push를 사용할 수 있도록 하는게 첫 번째 였습니다.
+
+하지만 캐시 자체적인 기능으로는 분별할 수가 없었습니다.
+
+## 1.
+
+```json
+complete:cache:
+  stage: complete
+  when: manual
+  script:
+    - yarn install
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: push
+```
+
+처음에는 push 하는 job에 when: manual을 줘서 업데이트를 해줘야 할때는 수동으로 버튼을 클릭해 push 해주도록 했습니다.
+
+**단점**
+
+이렇게 하니 업데이트 시기를 직접 판단해야 했습니다.
+
+- pull 했을때 cache 파일을 제대로 불러오는지 확인
+- yarn.lock에 변경사항이 있을때
+
+이걸 자동으로 판단하고 push를 할 수는 없을까 생각을 하고 찾아보니 괜찮은 자료가 있었습니다.
+
+## 2-1. node_modules
+
+```json
+prepare:cache:
+  stage: prepare
+  script:
+    - yarn install --check-files --frozen-lockfile | tee yarn_log
+    - |
+      if grep "success Already up-to-date." yarn_log; then
+        exit 0    # skip pushing cache
+      else
+        exit 123  # push cache
+      fi
+  allow_failure:
+    exit_codes: 123
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules
+    policy: pull-push
+    when: on_failure
+```
+
+이 코드는 node_modules를 캐시 했을때 사용하는 방법이였습니다.
+
+node_modules이 존재하는 상태에서 yarn install을 해주면 install이 끝나는 시점에 `"success Already up-to-date."` 라는 문구가 뜨는데 tee를 이용해 해당 문구를 넣고 script에서 bash script를 이용해 조건문으로 해당 문구가 떴는지 확인을 해줬습니다.
+
+그리고 allow_failure, cache의 when을 on_failure로 지정해줬는데
+
+- allow_failure
+  실패를 해도 해당 job에서 종료하는것이 아닌 다음 파이프 라인으로 이어지게 해주는 키워드 입니다.
+  - `exit_codes` - 지정 코드로 종료시 적용됩니다.
+  - 참고 - [https://docs.gitlab.com/ee/ci/yaml/#allow_failure](https://docs.gitlab.com/ee/ci/yaml/#allow_failure)
+- when: on_failure
+  job이 실패한 경우에만 작업을 실행
+  - 참고 - [https://docs.gitlab.com/ee/ci/yaml/#when](https://docs.gitlab.com/ee/ci/yaml/#when)
+
+전체적으로 풀이하면 조건문을 이용해서 캐시된 파일을 제대로 불러온다면
+`"success Already up-to-date."` 문구가 뜰테니 `exit 0` 을 해줍니다.
+
+반대로 제대로 불러오질 못한다면 캐시를 업로드 해줘야 하니 `exit 123` 으로 종료해 해당 job을 passed 상태로 만들어주고 실패 했기에 `when: on_failure` 으로 인해 cache 해줄 지정 디렉토리리 또는 파일을 push 해줍니다.
+
+**단점**
+
+- pull을 해줘야한다.
+- yarn install을 무조건 해줘야 한다.
+- yarn cache를 적용하면 위와같은 `"success Already up-to-date."` 문구가 뜨지 않는다.
+
+## 2-2. yarn cache
+
+```json
+cache-yarn:
+  stage: cache
+	script:
+    - yarn install
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: push
+  only:
+		changes:
+	    - yarn.lock
+
+complete:cache:
+  stage: complete
+  when: manual
+  script:
+    - yarn install
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: push
+```
+
+yarn cache로 지정을 해줘야 되기에 관련사항을 찾아보니 only라는 키워드를 활용하는 부분이 있었습니다.
+
+- only
+  - 지정해준 파일이 변경 되었을 때만 해당 job이 활성화 됩니다.
+  - 참고 - [https://docs.gitlab.com/ee/ci/yaml/#only--except](https://docs.gitlab.com/ee/ci/yaml/#only--except)
+
+하지만 이렇게 하니 캐시된 파일이 없는데 yarn.lock 파일도 변경사항이 없을때 캐시 파일을 업로드를 해주지 못했습니다.
+
+그래서 처음에 사용했던 수동으로 업데이트 하는 버튼을 추가해 캐시파일이 존재하는 상태에서는 pull을 사용하는 job만 활성화 되게 하였습니다.
+
+**단점**
+
+- 수동으로 조작해줘야 되는 버튼이 존재
+
+## 3.
+
+```json
+prepare:cache:
+  stage: prepare
+  script:
+    - |
+      if [ -d .yarn-cache ]; then
+        echo ".yarn-cache 파일 존재!"
+        exit 0    # skip pushing cache
+      else
+        yarn install
+        exit 123  # push cache
+      fi
+  allow_failure:
+    exit_codes: 123
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull-push
+    when: on_failure
+```
+
+위의 node_modules 를 캐시했을때 이용하는 부분을 참고해 script에서
+`-d .yarn-cache` 로 .yarn-cache 가 있는지 판단해 조건문을 걸어주고 존재하지 않을시 실패를 시켜 push를 시켰습니다.
+
+job을 하나로 줄이고 수동버튼을 제거하며 cache 된 파일이 없을 경우에만
+`yarn install`을 해줬습니다.
+
+**단점**
+
+- cache push시 pipeline의 status가 success가 아닌 passed로 됩니다.
+- cache pull을 해줘 cache 파일이 존재하는지 확인을 해줘야 됩니다.
+
+## 4.
+
+```json
+prepare:cache:
+  stage: prepare
+  script:
+    - |
+      if [ -d .yarn-cache ]; then
+        exit 0    # skip pushing cache
+      else
+        yarn install
+        exit 123  # push cache
+      fi
+	retry: 1
+  allow_failure:
+    exit_codes: 123
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull-push
+    when: on_failure
+```
+
+위의 코드는 작동하지 않습니다.
+
+이유는 여기서 추가한 키워드는 `retry`로 실패를 했을경우 job을 다시 실행시키는 키워드 입니다.
+
+캐시 파일이 없을 경우 실패를 유도해서 push 하기에 다시 retry를 해서 두번째에는 캐시 파일이 존재하기에 성공하겠지? 라는 생각으로 시도해 보았는데 실패후 재실행이 안되는 문제가 발생하였습니다.
+
+### Retry 이슈
+
+pending에서 멈춰있습니다.
+
+[https://gitlab.com/gitlab-org/gitlab/-/issues/387775](https://gitlab.com/gitlab-org/gitlab/-/issues/387775)
+
+[GitLab CI jobs queued on retry](https://forum.gitlab.com/t/gitlab-ci-jobs-queued-on-retry/78018/7)
+
+[gitlab-runner sometimes ignores jobs (#22088) · Issues · GitLab.org / GitLab · GitLab](https://gitlab.com/gitlab-org/gitlab/-/issues/22088#note_1228626279)
+
+## 5. 최종 코드
+
+우선 pipeline의 status 상태를 seccess 상태로 push 하는 방법에 대해서는 찾지 못하였습니다.
+
+기존에 시도한 방법들에서 최대한 최적화를 해보고자 하였고 다음 코드가 나왔습니다.
+
+```json
+image: node:16-slim
+
+stages:
+  - test
+  - apply
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull
+
+unit_test:
+  <<: *default_cache_group
+  stage: test
+  only:
+    - merge_requests
+    - main
+  script:
+    - |
+      if [ -d .yarn-cache ]; then
+        # echo "yarn cache Update Pass!!"
+        echo "IS_CACHE=true" >> cache.env
+      else
+        # echo "yarn cache Update!"
+        echo "IS_CACHE=false" >> cache.env
+      fi
+    - yarn install
+  artifacts:
+    reports:
+      dotenv: cache.env
+
+apply_cache:
+  stage: apply
+  only:
+    - merge_requests
+    - main
+  script:
+    - |
+      if [ $IS_CACHE = "true" ]; then
+        echo "yarn cache Update Pass!"
+        exit 0    # skip pushing cache
+      else
+        yarn install
+        echo "yarn cache Update!"
+        exit 123  # push cache
+      fi
+  cache:
+    <<: *default_cache_item
+    policy: push
+    when: on_failure
+  allow_failure:
+    exit_codes: 123
+```
+
+- anchors
+  - &default_cache_group, &default_cache_item 를 만들어 각각 캐시가 필요한 곳에 넣었습니다.
+  - 참고 - [https://docs.gitlab.com/ee/ci/yaml/yaml_optimization.html](https://docs.gitlab.com/ee/ci/yaml/yaml_optimization.html)
+- artifacts
+  - 실제로 테스트를 하는 job을 실행해서 cache를 pull로 가져온뒤 install을 하기전 조건문으로 .yarn-cache 파일을 확인해주며 artifacts 를 사용해 환경변수를 다른 job에서 공유할 수 있도록 하였습니다.
+  - 참고 - [https://docs.gitlab.com/ee/ci/yaml/#artifacts](https://docs.gitlab.com/ee/ci/yaml/#artifacts)
+
+앞선 테스트에서 캐시 파일의 유무를 확인하고 그 값을 환경변수로 공유해 후에 오는 apply_cache job에서 한번 더 조건문으로 확인하도록 하였습니다.
+
+이렇게 한 이유는 불필요한 pull을 없애고 캐시가 존재하는지 파악하기 위해서입니다.
+
+그래서 캐시가 없다고 판단되면 yarn install을 해주고 캐시 파일을 업로드 해줍니다.
+
+cache push시 pipeline의 status가 success가 아닌 passed로 되는 문제는 여전히 존재
+
+## 테스트 해본 키워드
+
+위의 단점을 개선하기 위해 사용해본 키워드를 나열해보고 왜 실패 했는지에 대해 설명 해보겠습니다.
+
+### rules
+
+[Choose when to run jobs | GitLab](https://docs.gitlab.com/ee/ci/jobs/job_control.html)
+
+- `if`
+- `changes`
+- `exists`
+- `allow_failure`
+- `variables`
+- `when`
+
+조건문과 지정 파일이 변경이 되거나 특정파일이 존재할때 사용되는 등 파이프라인을 실행할지 말지에 대한 조건을 정할 수 있었습니다.
+
+처음에는 이걸 활용하면 캐시해야되는 상황에만 push job이 실행되게 할 수 있지 않을까 했는데 실패 했습니다.
+
+이유는 캐시를 불러오는 시점보다 rules로 판별하는 시점이 더 빨라서 캐시 파일의 존재 유무를 확인할 수 없었습니다.
+
+중간에 조건문으로 환경변수를 변경해줘서 그걸 rules에서 사용할 수는 없을까 했지만 중간에 환경변수를 변경해줘도 그에 맞는 동작을 하지 않았습니다. 파이프라인이 생성되는 시점에서 확인을 해주는것 같습니다.
+
+### include
+
+[GitLab CI/CD include examples | GitLab](https://docs.gitlab.com/ee/ci/yaml/includes.html)
+
+```json
+//.gitlab-ci.yml
+
+include:
+  - local: cache-policy-pull-push.gitlab-ci.yml
+    rules:
+      - if: $BUILD_VERSION == "false"
+  - local: cache-policy-pull.gitlab-ci.yml
+    rules:
+      - if: $BUILD_VERSION == "true"
+```
+
+- cache-policy-pull-push.gitlab-ci.yml
+
+  ```json
+  //cache-policy-pull-push.gitlab-ci.yml
+
+  .cache-policy:
+    cache:
+      policy: pull-push
+  ```
+
+- cache-policy-pull.gitlab-ci.yml
+
+  ```json
+  //cache-policy-pull.gitlab-ci.yml
+
+  .cache-policy:
+    cache:
+      policy: pull
+  ```
+
+- .gitlab-ci.yml
+
+  ```json
+  //.gitlab-ci.yml
+
+  demo:
+    stage: cache
+    script:
+      - yarn install
+    cache:
+      key:
+        files:
+          - yarn.lock
+      paths:
+        - .yarn-cache/
+      policy: !reference [.cache-policy, cache, policy]
+  ```
+
+include 를 사용해서 프로젝트 내에 존재하는 yml 파일을 불러와 cache의 poliy를 상황에 맞게 지정을 해줄 수 있었습니다.
+
+하지만 이 방법도 중간에 환경변수를 변경하는 방법으로 되지 않았습니다.
+
+artifacts로 환경변수를 넘겨주고 해당 환경변수로 include를 해서 알맞은 .yml 파일을 가져오는 것을 상상했는데 오히려 variables보다도 include가 빠르게 동작하는 것으로 보였습니다.
+
+## yarn install 말고 다른 캐시할것
+
+nextjs 의 빌드 파일 안에 cache 를 캐시해서 빌드할 때 사용할 수 있습니다.([https://nextjs.org/docs/advanced-features/ci-build-caching#gitlab-ci](https://nextjs.org/docs/advanced-features/ci-build-caching#gitlab-ci))
+
+현재 PIMS에서 jest test를 하는데 이것도 캐시를 적용해 변경사항에 대한 부분만 테스트 할 수있는 글은 본것같습니다.([https://gist.github.com/rishitells/3c4536131819cff4eba2c8ab5bbb4570](https://gist.github.com/rishitells/3c4536131819cff4eba2c8ab5bbb4570))
+
+# 추가 테스트!
+
+## yarn cache 활용한 yarn add
+
+테스트 순서
+
+1. `YARN_CACHE_FOLDER=”.yarn-cache”` 환경변수로 캐시 디렉토리 지정
+2. `yarn install` node_module 설치
+3. `yarn add antd` antd 설치
+
+   1. 첫 번째 테스트 (21.05s)
+
+   2. 두 번째 테스트 (20.44s)
+
+4. `yarn remove antd` antd 라이브러리 삭제
+5. `yarn add antd` antd 설치
+
+   (삭제를 했어도 yarn cache에 antd 정보가 담겨 있습니다)
+
+   1. 첫 번째 테스트 (14.61s)
+   2. 두 번째 테스트 (13.01s)
+
+cache 데이터 없이 yarn add 로 설치 했을 때 20-21초 가량 걸렸는데 yarn cache를 활용해 cache된 antd를 설치하면서 13-14초 라는 시간으로 6-7초 이상 단축된걸 볼 수 있었습니다.
+
+## 위의 테스트가 gitlab ci cache에서 yarn을 사용하는 이유가 될까?
+
+로컬에서 캐시된 yarn cache 파일을 불러오는 것이 아닌 내부에서 yarn install을 하고 생성된 yarn cache 파일을 gitlab에 캐시하는 것이기 때문에 해당 사항은 gitlab ci cache에서 고려해 볼만 하지 않은것 같습니다.
+
+- gitlab runner 에서 yarn add → yarn remove → yarn add 를 하는 경우가 있지는 않을 것 같습니다.
+
+## 새로운 방법 - 상시로 캐시 파일을 불러와 사용
+
+위에 테스트를 하다가 생각해보니 key 값을 yarn.lock 파일이 아닌 [미리 정의한 키 값] 이라던가 고정적인 값으로 주고 업데이트 유무와 관계없이 캐시파일을 항상 불러온뒤 install에 사용을 하는것도 하나의 방법일것 같다고 생각이 들었습니다. gitlab ci cache를 업데이트 못해줬다해도 기존에 캐시된 파일을 사용하고 부족한 부분에 대해서도 없는 데이터만 install 하기에 좀 더 빠르게 만들 수 있을것 같습니다.
+
+- cache key를 미리 정의한 key값으로 사용하고 cache push 한 뒤 yarn.lock 파일을 변경해서 push 한 상황입니다.
+  - 온전한 캐시 사용 install - 16.64s
+  - 전체 install - 65.44s
+  - 캐시 + 부족한 라이브러리만 install - 30.05s
+
+## 수동
+
+**개선점**
+
+- 수동으로 cache push를 한다면 cache update 시점이 적절하지 못하다 해도 기존에 cache된 디렉토리를 활용해 install을 빠르게 할 수 있습니다.
+
+**.gitlab-ci.yml**
+
+```json
+image: node:16-slim
+
+stages:
+  - test
+  - complete
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+  YARN_CACHE_KEY: yarn-cache
+
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key:
+      "$YARN_CACHE_KEY"
+      # files:
+      #   - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull
+
+unit_test:
+   <<: *default_cache_group
+   stage: test
+   only:
+     - merge_requests
+     - main
+   script:
+     - yarn install
+
+complete:cache:
+  stage: complete
+  when: manual
+  script:
+    - yarn install
+  cache:
+		<<: *default_cache_item
+    policy: pull-push
+```
+
+complete job에서 pull-push 를 해주는 이유는 업데이트가 될수도 있기 때문입니다.
+
+cache의 key 값은 직접 정의한 환경변수입니다. 이는 변하는 값이 아니기에 이전에 캐시한 내용이 있다면 불러들여 yarn install에 활용하고 새롭게 생성된 .yarn-cache 파일을 push 해줍니다.
+
+## 자동
+
+미리 정의한 환경변수로 캐시파일을 불러와 사용하는 방법으로 자동적으로 캐시되게 하는 부분을 어떻게 처리할 것인가?
+
+### 1. yarn cache
+
+현재 key 값으로 .yarn-cache 디렉토리를 불러오고 .yarn-cache 디렉토리가 존재할 경우 환경변수를 지정해줘 유무를 판단했는데 이렇게 될 경우
+
+- 캐시가 아예 없는 상황
+
+위의 상황을 제외하고는 항상 값을 불러올테니 cache push 관련 잡을 두 개 만들어 사용하면 가능할 것 같습니다.
+
+1. update cache job - only 키워드를 사용한 job에서 push yarn.lock이 변경된 시점에 업데이트
+2. upload cache job - yarn install을 하는 job에서 cache pull 시점에 .yarn-cache 디렉토리가 존재하는지 확인 후 환경변수를 지정해 artifacts로 넘겨 준다면, 넘겨받은 값으로 조건문을 넣어 cache push 를 할지 선택
+   - .yarn-cache 디렉토리가 존재하지 않는다면 아예 캐시된 파일이 없는것이니 yarn install시 cache pull을 활용할 필요없다.
+
+**주의**
+
+.yarn-cache를 체크하는 job → update cache job → upload cache job 순서로 놓는다면 yarn.lock도 변하면서 .yarn-cache 디렉토리도 없으면 두 job이 모두 실행되기에 update cache job을 제일 앞에 둔다.
+
+.yarn-cache를 체크하는 job → update cache job 에서 환경변수를 새롭게 세팅해줘도 되겠지만 이경우 업데이트 안된 캐시로 두 번의 install을 해야한다. update cache job이 앞에 있으면 후에 오는 job은 온전한 캐시값으로 작업할 수 있다.
+
+**개선점**
+
+- yarn.lock이 변경되어 cache push를 해줘야 되는 시점에도 pull을 활용해 yarn install을 더 빠르게 하고 cache push 할 수 있습니다.
+- upload cache job에서 cache push 시점에 pipeline의 status가 passed로 변하는 단점이 존재하지만 cache 된 파일이 아예 없는 경우에만 적용이 되기에 초기에 캐시값을 넣어준다거나 특별한 상황이 아니고는 해당 job에서 cache push 되는 경우는 거의 없을 것 같습니다.
+
+```json
+image: node:16-slim
+
+stages:
+  - update
+  - test
+  - upload
+  - complete
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key: one-key-to-rule-them-all
+    paths:
+      - .yarn-cache/
+    policy: pull
+
+update_cache:
+  stage: update
+  only:
+    changes:
+      - yarn.lock
+  script:
+    - yarn install
+    - ls -al
+  cache:
+    <<: *default_cache_item
+    policy: pull-push
+
+unit_test:
+  <<: *default_cache_group
+  stage: test
+  only:
+    - merge_requests
+    - main
+  script:
+    - |
+      if [ -d .yarn-cache ]; then
+        echo "yarn cache Update Pass!!"
+        echo "IS_CACHE=true" >> cache.env
+      else
+        echo "yarn cache Update!"
+        echo "IS_CACHE=false" >> cache.env
+      fi
+    - yarn install
+  artifacts:
+    reports:
+      dotenv: cache.env
+
+upload_cache:
+  stage: upload
+  only:
+    - merge_requests
+    - main
+  script:
+    - |
+      if [ $IS_CACHE = "true" ]; then
+        echo "yarn cache Update Pass!"
+        exit 0    # skip pushing cache
+      else
+        # yarn install
+        echo "yarn cache Update!"
+        exit 123  # push cache
+      fi
+  cache:
+    <<: *default_cache_item
+    policy: push
+    when: on_failure
+  allow_failure:
+    exit_codes: 123
+```
+
+위의 전체적인 코드는 yarn.lock 파일이 변경되면 updata job이 다른 파이프라인에서 실행되고 동시에 나머지 job이 다른 파이프라인에서 실행됩니다. 그리고 merge_requests 한 작업이 아닌 모든 push에서 실행되고 있습니다.
+
+**개선 필요**
+
+- 위의 주의로 적어놓은 내용 처럼 동일한 파이프라인에서 update job이 먼저 실행되고 나머지 job이 실행되길 원했는데 이게 안됐습니다.
+  **이유 - only**
+  update job을 제외한 job의 only를 보면 merge_requests, main 의 경우에서 파이프라인이 실행되게 했는데 동일한 파이프라인으로 구성하려면 update job도 해당 조건을 넣어줘야 됐습니다. 하지만 이렇게 넣어주니 changes에 대해 제대로된 동작을 하지 않았습니다. (무조건 포함되서 실행됨)
+  여러 조건을 넣어줘보고 rules로 구성을 바꿔서도 시도해 보았는데 안됐습니다.
+  예)
+
+  ```json
+  workflow:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+  update_cache:
+    stage: update
+    rules:
+      - changes:
+          - yarn.lock
+        when: on_success
+      - when: never
+  	script:
+  		- echo "updata"
+
+  unit_test:
+    stage: test
+    script:
+      - echo "test"
+  ```
+
+  yarn.lock 파일을 바꿔주던 안바꿔주던 update_cache job이 실행됩니다.
+
+  **원인**
+  추정이지만 상위/하위 파이프라인에 대한 개념 때문인것 같습니다. ([https://docs.gitlab.com/ee/ci/troubleshooting.html#documentation-for-pipeline-types](https://docs.gitlab.com/ee/ci/troubleshooting.html#documentation-for-pipeline-types))
+  살펴봐도 잘 이해가 안가고 아직 정확한 원인은 잘 모르겠습니다.
+
+  **참고**
+
+  - [https://docs.gitlab.com/ee/ci/troubleshooting.html#a-job-runs-unexpectedly](https://docs.gitlab.com/ee/ci/troubleshooting.html#a-job-runs-unexpectedly)
+  - [https://forum.gitlab.com/t/how-to-distinguish-changes-in-root-files-from-changes-in-subfolders/62881/2](https://forum.gitlab.com/t/how-to-distinguish-changes-in-root-files-from-changes-in-subfolders/62881/2)
+  - [https://gitlab.com/gitlab-org/gitlab/-/issues/34272](https://gitlab.com/gitlab-org/gitlab/-/issues/34272)
+  - [https://docs.gitlab.com/ee/ci/pipelines/](https://docs.gitlab.com/ee/ci/pipelines/)
+    **원인찾음**
+  - 무분별한 커밋으로 테스트를 하다보니 문제가 생김.
+  - 참고 - [https://forum.gitlab.com/t/rules-changes-will-look-at-last-commit-only/41308/2](https://forum.gitlab.com/t/rules-changes-will-look-at-last-commit-only/41308/2)
+  - yarn.lock의 차이를 확인하는 부분이 main부분 인것 같습니다. 여러 커밋 푸시를 통해 yarn.lock 파일을 다르게 구성한다 하더라도 changes가 main과 비교하기에 해당 브랜치에서 yarn.lock을 변경해줬다면 해당 브랜치의 모든 커밋 푸시시 계속적으로 update job이 활성화 됩니다.
+
+**최종 코드**
+
+```json
+image: node:16-slim
+
+stages:
+  - update
+  - test
+  - upload
+  - complete
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key: one-key-to-rule-them-all
+    paths:
+      - .yarn-cache/
+    policy: pull
+
+update_cache:
+  stage: update
+  rules:
+    - changes:
+        - yarn.lock
+  script:
+    - yarn install
+  cache:
+    <<: *default_cache_item
+    policy: pull-push
+
+unit_test:
+  <<: *default_cache_group
+  stage: test
+  script:
+    - |
+      if [ -d .yarn-cache ]; then
+        echo "yarn cache Update Pass!!"
+        echo "IS_CACHE=true" >> cache.env
+      else
+        echo "yarn cache Update!"
+        echo "IS_CACHE=false" >> cache.env
+      fi
+    - yarn install
+  artifacts:
+    reports:
+      dotenv: cache.env
+
+upload_cache:
+  stage: upload
+  script:
+    - |
+      if [ $IS_CACHE = "true" ]; then
+        echo "yarn cache Update Pass!"
+        exit 0    # skip pushing cache
+      else
+        # yarn install
+        echo "yarn cache Update!"
+        exit 123  # push cache
+      fi
+  cache:
+    <<: *default_cache_item
+    policy: push
+    when: on_failure
+  allow_failure:
+    exit_codes: 123
+```
+
+이렇게 구성하면 yarn.lock 파일이 변경되면 update를 하고 gitlab에 저장된 캐시 파일이 없다면 upload를 합니다.
+
+upload job에서 캐시 업로드를 한다면 실패 후 업로드가 되기에 파이프라인 상태는 passed로 느낌표로 뜨겠지만 이 경우는 캐시가 없는 시점에 일어나기에 빈번하게 일어나지는 않을것 같습니다.
+
+### 2. node_modules cache
+
+두 가지 방법이 있을 것 같습니다.
+
+1. 위의 yarn cache 하는 부분에서 조건문을 yarn install시 마지막에 출력되는 출력문으로 조건문을 판별하도록 바꿉니다.
+2. upload job을 지우고 yarn install 시 마지막에 출력되는 출력문을 기준으로 update가 필요한 상황인지 cache가 존재하지 않는지를 모두 판별할 수 있습니다.
+   - 하지만 이때는 update가 필요한 상황이던 cache가 없는 상황이던 파이프라인의 상태는 passed로 느낌표 표시가 됩니다.
+
+### 3. 기타
+
+모듈이 추가된다고 하더라고 기존 캐시로 yarn install을 빠르게 할 수 있기에 yarn install을 사용하는 시점에 캐시를 pull-push를 상시 같이 해준다는 방법도 있습니다. 하지만 캐시 업데이트는 자동으로 될테지만 불필요한 push가 이루어집니다.
+
+# 결론
+
+개인적으로 최선은 마지막에 시도한 key값을 고정하고 update와 upload job을 따로 두어 사용하는 방식이라고 생각합니다.
+
+```json
+image: node:16-slim
+
+stages:
+  - update
+  - test
+  - upload
+  - complete
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key: one-key-to-rule-them-all
+    paths:
+      - .yarn-cache/
+    policy: pull
+
+update_cache:
+  stage: update
+  rules:
+    - changes:
+        - yarn.lock
+  script:
+    - yarn install
+  cache:
+    <<: *default_cache_item
+    policy: pull-push
+
+unit_test:
+  <<: *default_cache_group
+  stage: test
+  script:
+    - |
+      if [ -d .yarn-cache ]; then
+        echo "yarn cache Update Pass!!"
+        echo "IS_CACHE=true" >> cache.env
+      else
+        echo "yarn cache Update!"
+        echo "IS_CACHE=false" >> cache.env
+      fi
+    - yarn install
+  artifacts:
+    reports:
+      dotenv: cache.env
+
+upload_cache:
+  stage: upload
+  script:
+    - |
+      if [ $IS_CACHE = "true" ]; then
+        echo "yarn cache Update Pass!"
+        exit 0    # skip pushing cache
+      else
+        # yarn install
+        echo "yarn cache Update!"
+        exit 123  # push cache
+      fi
+  cache:
+    <<: *default_cache_item
+    policy: push
+    when: on_failure
+  allow_failure:
+    exit_codes: 123
+```
+
+# 회고
+
+gitlab ci caching 최적화를 위해 pull과 push를 나누는 방법을 채택했지만 처음 시도한 버튼을 눌러 캐시를 업로드 하는 방법에는 캐시 업로드가 필요한 시점을 직접 판단하여 업로드를 해줘야 된다는 불편함이 있었습니다.
+
+이러한 문제로 업로드가 필요한 시점에 자동으로 해주게 개선하였지만 파이프라인의 상태가 실패로 존재하는 것이 뭔가 마음에 들지는 않았고 많은 시도를 해보았지만 결국 완벽하다 생각하는 방법은 찾지 못한것 같습니다.
+
+시도한 방법 중에는 가장 아쉬웠던건 retry 키워드 였습니다.
+
+retry 키워드를 이용해 실패후 온전히 업로드된 cache로 재시도 했을때는 파이프라인의 상태가 성공으로 바뀌겠지 이 방법이네! 문제를 해결했다 생각하고 너무 기분이 좋았는데 장시간 대기하게 되는 이슈가 있어 실패로 끝난게 너무 아쉬웠습니다.
+
+완벽하게 만족은 못하고 끝낸 gitlab ci caching 최적화지만 다양한 시도를 하며 gitlab ci 와 많이 친해질 수 있었고 점점 나아짐에 재미있게 시간을 보냈습니다.
