@@ -1,0 +1,31 @@
+---
+title: "iOS 14.5에서 crypto.randomUUID()"
+publishedAt: "2024-01-20"
+summary: "iOS 14.5 이전 버전의 Safari에서는 `crypto.randomUUID()`가 기본적으로 지원되지 않아 에러가 발생합니다."
+---
+
+**아이폰 14.5 버전에서 웹을 켜는데 crypto.randomUUID() 관련 에러가 발생**
+
+최신버전에서만 테스트를 하다보니 에러가 뜨는걸 모르다가 나중에 qa 테스트를 통해 알게 되었습니다.
+
+## 원인
+
+> `crypto.randomUUID();`
+>
+> 이 함수는 브라우저의 `window.crypto` 객체를 사용하여 랜덤 UUID(Universally Unique Identifier)를 생성하는데 사용
+
+원인은 iOS 14.5 버전 이전의 웹 브라우저에서는 `crypto.randomUUID()` 함수가 기본적으로 지원되지 않는 문제였습니다.
+
+iOS 14.5 버전 이전의 Safari 브라우저에서는 `window.crypto` 객체가 지원되지 않아`crypto.randomUUID()`가 동작하지 않았고, 따라서 해당 버전의 iOS에서는 다른 방식으로 UUID를 생성해야 했습니다.
+
+## 해결
+
+1. uuid 라이브러리 설치
+
+```
+import { v4 as uuidv4 } from 'uuid';
+
+uuidv4();
+```
+
+기존 uuid 생성에 사용한 코드를 라이브러리를 사용해서 대체하였습니다.
