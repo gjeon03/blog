@@ -86,18 +86,14 @@ function createHeading(level) {
   return Heading;
 }
 
-function Block(props) {
+function Block({ children }) {
+  // const childrenArray = React.Children.toArray(children);
+
+  console.log("children: ", children);
+
   return (
-    <div
-      style={{
-        borderLeft: "4px solid #ccc",
-        backgroundColor: "#f1f1f1",
-        padding: "10px",
-        marginBottom: "10px",
-        marginTop: "10px",
-      }}
-    >
-      {props.children}
+    <div className="block py-3 px-4 my-4 bg-gray-100 border-l-4 border-gray-400">
+      {children}
     </div>
   );
 }

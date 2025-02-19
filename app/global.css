@@ -50,7 +50,7 @@ html {
 }
 
 .prose a {
-  @apply underline transition-all decoration-neutral-400 dark:decoration-neutral-600 underline-offset-2 decoration-[0.1em];
+  @apply underline transition-all decoration-neutral-400 dark:decoration-neutral-600 underline-offset-2 decoration-[0.1em] break-all;
 }
 
 .prose .anchor:after {
@@ -86,7 +86,7 @@ html {
 }
 
 .prose p {
-  @apply my-4 text-neutral-800 dark:text-neutral-200;
+  @apply my-4 text-neutral-800 dark:text-neutral-200 whitespace-pre-line;
 }
 
 .prose h1 {
@@ -149,4 +149,13 @@ table {
 
 .title {
   text-wrap: balance;
+}
+
+.block > h1,
+.block > h2,
+.block > h3,
+.block > h4,
+.block > h5,
+.block > h6 {
+  margin-top: 0px;
 }
