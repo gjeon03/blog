@@ -92,7 +92,7 @@ function Block({ children }) {
   console.log("children: ", children);
 
   return (
-    <div className="block py-3 px-4 my-4 bg-gray-100 border-l-4 border-gray-400">
+    <div className="block py-3 px-4 my-4 bg-gray-100 border-l-4 border-gray-400 dark:bg-gray-800 dark:border-gray-600">
       {children}
     </div>
   );
