@@ -1,0 +1,67 @@
+---
+title: "Ubuntu SSH Google Authenticator OTP 인증 실패 해결"
+publishedAt: "2025-02-23"
+summary: "Google Authenticator OTP 설정 후 SSH 로그인 시 인증 실패가 발생하는 문제를 해결하는 방법을 설명합니다. 로그 분석을 통해 원인을 파악하고, 올바른 계정에 OTP 설정 파일을 이동하여 인증 오류를 해결합니다."
+---
+
+OTP 설정 이후에 아무리해서 외부에서 접근이 안됐습니다. 이유도 도저히 모르겠고 google-authenticator 를 통해 몇번이고 재설치와 재설정을 반복해도 해결이 안되었습니다. 한참을 붙잡고 결국 해결이 되었는데 원인은 경로 문제였습니다.
+
+## **문제**
+
+- SSH 로그인 시 **OTP 코드 입력 후에도 계속 인증 실패** (`Invalid verification code`)
+- SSH 로그 확인 시 다음 오류 발생:
+  ```bash
+  Failed to read "/home/gyeongyeon/google_authenticator" for "gyeongyeon"
+  No secret configured for user gyeongyeon, asking for code anyway.
+  ```
+- 원인은 **Google Authenticator 설정 파일이 `root` 계정에만 존재**하고, SSH 로그인 계정(`gyeongyeon`)에는 파일이 없었기 때문.
+
+### **SSH 인증 로그 확인**
+
+SSH 인증 과정에서 발생하는 오류를 확인하려면 **로그를 확인**해야 합니다.
+
+```bash
+sudo journalctl -u ssh --no-pager | tail -n 50
+```
+
+또는
+
+```bash
+sudo cat /var/log/auth.log | grep sshd | tail -n 20
+```
+
+**로그에서 확인할 내용**
+
+- `Failed to read "/home/gyeongyeon/.google_authenticator"` → OTP 설정 파일이 없거나, 권한 문제
+- `Invalid verification code` → OTP 코드 불일치
+- `Permission denied (publickey,keyboard-interactive)` → 인증 방식 오류
+
+## **해결**
+
+1. **OTP 설정 파일을 `root`에서 이동**
+
+   ```bash
+   sudo mv /root/.google_authenticator /home/gyeongyeon/.google_authenticator
+   ```
+
+2. **파일 소유권 변경**
+
+   ```bash
+   sudo chown gyeongyeon:gyeongyeon /home/gyeongyeon/.google_authenticator
+   sudo chmod 600 /home/gyeongyeon/.google_authenticator
+   ```
+
+3. **SSH 로그인 테스트**
+
+   ```bash
+   ssh gyeongyeon@서버주소 -p 포트번호
+   ```
+
+   - **Google Authenticator 앱에서 생성된 OTP 코드 입력**
+   - **정상 로그인 확인**
+
+## **정리**
+
+- **OTP 설정 파일이 `root`에만 저장된 경우, SSH가 이를 읽지 못해 인증 실패 발생**
+- **설정 파일을 올바른 계정(`/home/gyeongyeon/`)으로 이동하고 권한을 수정하면 해결**
+- **SSH 로그를 통해 문제 원인을 정확히 파악할 수 있음 (`sudo journalctl -u ssh --no-pager | tail -n 50`)**
