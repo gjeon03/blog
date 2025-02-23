@@ -4,19 +4,13 @@ export default function Page() {
   return (
     <section>
       <h1 className="mb-8 text-2xl font-semibold tracking-tighter">
-        My Portfolio
+        JGY's Tech Blog
       </h1>
       <p className="mb-4">
-        Welcome to My Portfolio I'm a Frontend Developer passionate about
-        crafting clean and responsive user interfaces using Next.js. I thrive on
-        building dynamic and performant web applications, focusing on seamless
-        user experiences and maintainable codebases.
+        개발과 IT 기술을 탐구하는 블로그에 오신 것을 환영합니다!
         <br />
-        <br />
-        From exploring modern JavaScript frameworks to optimizing for SEO and
-        accessibility, I enjoy every step of building web applications. Dark
-        mode, static typing, and beautiful design patterns are my trusted tools
-        for a productive development journey.
+        직접 경험하며 배운 내용을 정리하고, 더 나은 해결 방법을 고민하는
+        공간입니다.
       </p>
       <div className="my-8">
         <BlogPosts />
