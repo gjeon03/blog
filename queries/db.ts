@@ -20,12 +20,3 @@ export async function getViewsCount(): Promise<
     count: row.count,
   }));
 }
-
-export const incrementView = async (slug: string) => {
-  noStore();
-  await sql`
-    INSERT INTO views (slug, count) VALUES (${slug}, 1)
-    ON CONFLICT (slug)
-    DO UPDATE SET count = views.count + 1
-  `;
-};
