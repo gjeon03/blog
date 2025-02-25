@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
 export const ThemeSwitcher = () => {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!("theme" in localStorage)) {
       const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const nextTheme = isDark ? "dark" : "light";
@@ -29,9 +29,15 @@ export const ThemeSwitcher = () => {
   };
 
   return (
-    <button aria-label="Toggle Dark Mode" type="button" onClick={handleToggle}>
-      <ThemeIcon theme={theme} />
-    </button>
+    theme && (
+      <button
+        aria-label="Toggle Dark Mode"
+        type="button"
+        onClick={handleToggle}
+      >
+        <ThemeIcon theme={theme} />
+      </button>
+    )
   );
 };
 
