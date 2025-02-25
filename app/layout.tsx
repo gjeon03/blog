@@ -12,15 +12,15 @@ import { themeEffect } from "utils/theme-effect";
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "Next.js Portfolio Starter",
-    template: "%s | Next.js Portfolio Starter",
+    default: "JGY's Blog",
+    template: "%s | JGY's Blog",
   },
-  description: "This is my portfolio.",
+  description: "This is my blog.",
   openGraph: {
-    title: "My Portfolio",
-    description: "This is my portfolio.",
+    title: "JGY's Blog",
+    description: "This is my blog.",
     url: baseUrl,
-    siteName: "My Portfolio",
+    siteName: "JGY's Blog",
     locale: "en_US",
     type: "website",
   },
@@ -35,6 +35,11 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/favicon.ico",
+    shortcut: "/favicon.ico",
+  },
 };
 
 const cx = (...classes) => classes.filter(Boolean).join(" ");
@@ -48,7 +53,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={cx(
-        "text-black bg-white dark:text-white dark:bg-black",
+        "text-black bg-white dark:text-white dark:bg-black flex justify-center",
         GeistSans.variable,
         GeistMono.variable
       )}
@@ -60,8 +65,8 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="antialiased max-w-full mx-4 mt-8 md:mx-auto md:max-w-3xl">
-        <main className="flex-auto min-w-0 mt-6 flex flex-col px-2 md:px-0">
+      <body className="max-w-xl mx-4 mt-8 antialiased lg:mx-auto">
+        <main className="flex flex-col flex-auto min-w-0 px-2 mt-6 md:px-0">
           <Navbar />
           {children}
           <Footer />
