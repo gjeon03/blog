@@ -1339,15 +1339,13 @@ upload job에서 캐시 업로드를 한다면 실패 후 업로드가 되기에
 
 # 결론
 
-개인적으로 최선은 마지막에 시도한 key값을 고정하고 update와 upload job을 따로 두어 사용하는 방식이라고 생각합니다.
+25년에 접어들면서 다시 확인을 해보니 이전에 너무 비효율적으로 작업을 한것같아 개선을 해보았습니다.
 
 ```json
 image: node:16-slim
 
 stages:
-  - update
   - test
-  - upload
   - complete
 
 variables:
@@ -1357,60 +1355,36 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
-.default_cache: &default_cache_group
-  cache: &default_cache_item
-    key: one-key-to-rule-them-all
-    paths:
-      - .yarn-cache/
-    policy: pull
-
-update_cache:
-  stage: update
-  rules:
-    - changes:
-        - yarn.lock
-  script:
-    - yarn install
-  cache:
-    <<: *default_cache_item
-    policy: pull-push
-
 unit_test:
-  <<: *default_cache_group
+  only:
+    - merge_requests
+    - main
   stage: test
   script:
+    - yarn install | tee yarn_log
     - |
-      if [ -d .yarn-cache ]; then
-        echo "yarn cache Update Pass!!"
-        echo "IS_CACHE=true" >> cache.env
+      if grep "success Already up-to-date." yarn_log; then
+        echo "No new packages, skipping yarn install."
       else
-        echo "yarn cache Update!"
-        echo "IS_CACHE=false" >> cache.env
-      fi
-    - yarn install
-  artifacts:
-    reports:
-      dotenv: cache.env
-
-upload_cache:
-  stage: upload
-  script:
-    - |
-      if [ $IS_CACHE = "true" ]; then
-        echo "yarn cache Update Pass!"
-        exit 0    # skip pushing cache
-      else
-        # yarn install
-        echo "yarn cache Update!"
+        echo "New packages, running yarn install."
         exit 123  # push cache
       fi
-  cache:
-    <<: *default_cache_item
-    policy: push
-    when: on_failure
+  retry: 1
   allow_failure:
     exit_codes: 123
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules
+    policy: pull-push
+    when: on_failure
 ```
+
+retry를 했을 경우 무한 대기하던 이슈는 해결되었으며, 이를 통해 retry 방식으로 push하는 방법을 채택하여 잡을 여러개로 나누기 보단 직접적으로 사용하는곳에서 pull-push가 모두 이루어지도록 개선을 했습니다. 그리고 .yarn-cache를 사용하는것보다 시간이 훨씬 줄어듬에 node_modules를 캐싱하도록 했습니다.
+
+아쉬웠던 점은, 특정 라이브러리를 추가하거나 제거할 때, pull을 통해 가져온 캐시를 기반으로 특정 라이브러리에 대한 추가 및 제거가 이루어질 것이라 예상했으나, yarn.lock과 node_modules 간에 불일치가 발생하여 전체 라이브러리를 다시 설치하는 문제가 있었습니다. 그래도 라이브러리 변경이 자주 일어나지 않기에, 크게 문제는 되지 않을 것 같습니다.
 
 # 회고
 
