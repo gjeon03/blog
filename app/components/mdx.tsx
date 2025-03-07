@@ -1,8 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { highlight } from "sugar-high";
-import React, { ReactNode } from "react";
+import React from "react";
+import dynamic from "next/dynamic";
+
+const Code = dynamic(() => import("./code"), { ssr: false });
 
 function Table({ data }) {
   let headers = data.headers.map((header, index) => (
@@ -48,11 +50,6 @@ function RoundedImage(props) {
   return <Image alt={props.alt} className="rounded-lg" {...props} />;
 }
 
-function Code({ children, ...props }) {
-  let codeHTML = highlight(children);
-  return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />;
-}
-
 function slugify(str) {
   return str
     .toString()
@@ -88,7 +85,7 @@ function createHeading(level) {
 
 function Block({ children }) {
   return (
-    <div className="block py-3 px-4 my-4 bg-gray-100 border-l-4 border-gray-400 dark:bg-gray-800 dark:border-gray-600">
+    <div className="block px-4 py-3 my-4 bg-gray-100 border-l-4 border-gray-400 dark:bg-gray-800 dark:border-gray-600">
       {children}
     </div>
   );
@@ -106,6 +103,7 @@ let components = {
   code: Code,
   Table,
   blockquote: Block,
+  pre: (props) => <pre className="relative group" {...props} />,
 };
 
 export function CustomMDX(props) {
