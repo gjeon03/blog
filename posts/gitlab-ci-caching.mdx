@@ -1,5 +1,5 @@
 ---
-title: "Caching in GitLab CI"
+title: "Caching in GitLab CI 최적화 해보기"
 publishedAt: "2023-03-08"
 summary: "GitLab CI 에서 build Caching 해보기"
 ---
@@ -1339,9 +1339,11 @@ upload job에서 캐시 업로드를 한다면 실패 후 업로드가 되기에
 
 # 결론
 
-25년에 접어들면서 다시 확인을 해보니 이전에 너무 비효율적으로 작업을 한것같아 개선을 해보았습니다.
+정답은 아니지만 나름 최종적으로 정한건 두 가지 입니다. 이후 다시 확인을 해보니 retry 이슈도 해결되었습니다.
 
-```json
+1.
+
+```yml
 image: node:16-slim
 
 stages:
@@ -1355,36 +1357,98 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key: one-key-to-rule-them-all
+    paths:
+      - node_modules
+    policy: pull
+
+cache_update:
+  only:
+    - main
+  stage: update
+  script:
+    - yarn install | tee yarn_log
+    - |
+      if grep "success Already up-to-date." yarn_log; then
+        exit 0    # skip pushing cache
+      else
+        exit 123  # push cache
+      fi
+  allow_failure:
+    exit_codes: 123
+  retry: 1
+  cache:
+    <<: *default_cache_item
+    policy: pull-push
+    when: on_failure
+
 unit_test:
+  <<: *default_cache_group
   only:
     - merge_requests
     - main
   stage: test
   script:
-    - yarn install | tee yarn_log
-    - |
-      if grep "success Already up-to-date." yarn_log; then
-        echo "No new packages, skipping yarn install."
-      else
-        echo "New packages, running yarn install."
-        exit 123  # push cache
-      fi
-  retry: 1
-  allow_failure:
-    exit_codes: 123
-  cache:
-    key:
-      files:
-        - yarn.lock
-    paths:
-      - node_modules
-    policy: pull-push
-    when: on_failure
+    - yarn install
 ```
 
-retry를 했을 경우 무한 대기하던 이슈는 해결되었으며, 이를 통해 retry 방식으로 push하는 방법을 채택하여 잡을 여러개로 나누기 보단 직접적으로 사용하는곳에서 pull-push가 모두 이루어지도록 개선을 했습니다. 그리고 .yarn-cache를 사용하는것보다 시간이 훨씬 줄어듬에 node_modules를 캐싱하도록 했습니다.
+2.
 
-아쉬웠던 점은, 특정 라이브러리를 추가하거나 제거할 때, pull을 통해 가져온 캐시를 기반으로 특정 라이브러리에 대한 추가 및 제거가 이루어질 것이라 예상했으나, yarn.lock과 node_modules 간에 불일치가 발생하여 전체 라이브러리를 다시 설치하는 문제가 있었습니다. 그래도 라이브러리 변경이 자주 일어나지 않기에, 크게 문제는 되지 않을 것 같습니다.
+```yml
+image: node:16-slim
+
+stages:
+  - test
+  - complete
+
+variables:
+  YARN_CACHE_FOLDER: .yarn-cache
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+.default_cache: &default_cache_group
+  cache: &default_cache_item
+    key: one-key-to-rule-them-all
+    paths:
+      - node_modules
+    policy: pull
+
+unit_test:
+  <<: *default_cache_group
+  only:
+    - merge_requests
+    - main
+  stage: test
+  script:
+    - yarn install
+
+cache_update:
+  only:
+    - main
+  stage: update
+  script:
+    - yarn install
+  cache:
+    <<: *default_cache_item
+    policy: push
+  when: manual
+```
+
+1 : retry를 했을 경우 무한 대기하던 이슈는 해결되었으며, 이를 통해 retry 방식으로 push하는 방법을 채택하여 잡을 여러개로 나누기 보단 직접적으로 사용하는곳에서 pull-push가 모두 이루어지도록 개선을 했습니다.
+
+2 : retry를 하면서 러너가 실행되는 시간도 아까울것 같다고 생각이 들면 manual을 통해서 개발자가 직접 push 하는걸 통제하는것도 좋은 방법일것 같습니다.
+
+1, 2 번 둘 다 키는 고정값으로 하고 main에서만 push 하도록 하였습니다. 그리고 .yarn-cache를 사용하는것보다 시간이 훨씬 줄어듬에 node_modules를 캐싱하도록 했습니다.
+생각해보니 키값이 동일하면 mr 생성시마다 여러 사람이 작업함에 pull-push가 빈번하게 일어날 수 있다는 생각이 들었습니다. 그래서 main에서만 통제를 하고 이후 생성하는 mr은 main에서 push 한 캐시를 사용하도록 하는게 어떨까 하였습니다.
+main에서 캐싱한걸 다른 브랜치에서 공유가 안되는 경우도 발생했는데 이때는 아래와 같이 수정해주었습니다.
+
+참고 : [Caching in GitLab CI/CD | GitLab Docs](https://docs.gitlab.com/ci/caching/#use-the-same-cache-for-all-branches)
+
+위 링크에서 나와있는것처럼 별도의 캐시 사용을 취소하여 main에서 캐싱한걸 다른 브랜치에서 사용하는걸 확인했습니다.
 
 # 회고
 
@@ -1394,6 +1458,6 @@ gitlab ci caching 최적화를 위해 pull과 push를 나누는 방법을 채택
 
 시도한 방법 중에는 가장 아쉬웠던건 retry 키워드 였습니다.
 
-retry 키워드를 이용해 실패후 온전히 업로드된 cache로 재시도 했을때는 파이프라인의 상태가 성공으로 바뀌겠지 이 방법이네! 문제를 해결했다 생각하고 너무 기분이 좋았는데 장시간 대기하게 되는 이슈가 있어 실패로 끝난게 너무 아쉬웠습니다.
+retry 키워드를 이용해 실패후 온전히 업로드된 cache로 재시도 했을때는 파이프라인의 상태가 성공으로 바뀌겠지 이 방법이네! 문제를 해결했다 생각하고 너무 기분이 좋았는데 장시간 대기하게 되는 이슈가 있어 실패로 끝난게 너무 아쉬웠습니다.**(이후 이슈 해결됨)**
 
 완벽하게 만족은 못하고 끝낸 gitlab ci caching 최적화지만 다양한 시도를 하며 gitlab ci 와 많이 친해질 수 있었고 점점 나아짐에 재미있게 시간을 보냈습니다.
