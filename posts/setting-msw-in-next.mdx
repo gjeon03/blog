@@ -1,0 +1,138 @@
+---
+title: "🛠️ Setting up MSW in a Next.js App Router Project"
+publishedAt: "2025-06-09"
+summary: "Nextjs의 App Route 에서 MSW를 세팅하는 방법"
+---
+
+This guide shows how to configure [Mock Service Worker (MSW)](https://mswjs.io/) in a **Next.js App Router** project for API mocking during development.
+
+### 1. Install MSW
+
+```bash
+npm i msw --save-dev
+```
+
+### 2. Initialize `mockServiceWorker.js`
+
+Generate the service worker file and place it in the `public` directory:
+
+```bash
+npx msw init ./public
+```
+
+### 3. Create the mock directories and files
+
+```bash
+mkdir -p mocks/handlers
+touch mocks/browser.ts mocks/server.ts mocks/index.ts
+touch mocks/handlers/index.ts mocks/handlers/get-temp1.ts mocks/handlers/get-temp2.ts
+```
+
+### 4. Setup `mocks/browser.ts`
+
+```tsx
+import { setupWorker } from "msw/browser";
+import { handlers } from "./handlers";
+
+export const worker = setupWorker(...handlers);
+```
+
+### 5. Setup `mocks/server.ts`
+
+```tsx
+import { setupServer } from "msw/node";
+import { handlers } from "./handlers";
+
+export const server = setupServer(...handlers);
+```
+
+### 6. Setup `mocks/index.ts`
+
+This file initializes MSW depending on whether the code is running in the browser or server.
+
+```tsx
+async function initMocks() {
+  if (typeof window === "undefined") {
+    const { server } = await import("./server");
+    server.listen();
+  } else {
+    const { worker } = await import("./browser");
+    worker.start();
+  }
+}
+
+initMocks();
+
+export {};
+```
+
+### 7. Create sample handlers - `get-temp1.ts`
+
+```tsx
+import { http, HttpResponse } from "msw";
+
+export const getTemp1 = http.get("https://api.example.com/user", () => {
+  return HttpResponse.json({
+    id: "abc-123",
+    firstName: "John",
+    lastName: "Maverick",
+  });
+});
+```
+
+### 8. Create sample handlers - `get-temp2.ts`
+
+```tsx
+import { http, HttpResponse } from "msw";
+
+export const getTemp2 = http.get("https://api.example.com/product", () => {
+  return HttpResponse.json({
+    id: "abc-123",
+    firstName: "John",
+    lastName: "Maverick",
+  });
+});
+```
+
+### 9. Combine handlers in `handlers/index.ts`
+
+```tsx
+import { getTemp1 } from "./get-temp1";
+import { getTemp2 } from "./get-temp2";
+
+export const handlers = [getTemp1, getTemp2];
+```
+
+### 10. Enable MSW in `layout.tsx` (App Router entry file)
+
+To enable mocking conditionally during development:
+
+```tsx
+// app/layout.tsx
+...
+if (process.env.NEXT_PUBLIC_API_MOCKING === "enabled") {
+  require("../mocks");
+}
+...
+```
+
+### 11. Add a script to `package.json`
+
+```json
+{
+	...
+	"scripts": {
+		...
+    "mock": "NEXT_PUBLIC_API_MOCKING=enabled next dev --turbopack"
+  },
+  ...
+}
+```
+
+### 12. Start the dev server with mocking enabled
+
+```bash
+npm run mock
+```
+
+Now your API calls will be intercepted and mocked by MSW 🎉
