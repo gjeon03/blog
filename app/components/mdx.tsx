@@ -2,9 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import React from "react";
-import dynamic from "next/dynamic";
-
-const Code = dynamic(() => import("./code"), { ssr: false });
+import { CopyButton } from "./code-copy-button";
 
 function Table({ data }) {
   let headers = data.headers.map((header, index) => (
@@ -100,10 +98,29 @@ let components = {
   h6: createHeading(6),
   Image: RoundedImage,
   a: CustomLink,
-  code: Code,
   Table,
   blockquote: Block,
-  pre: (props) => <div {...props} />,
+  pre: (props) => {
+    const {
+      children: {
+        props: { className, children },
+      },
+    } = props;
+
+    if (
+      className &&
+      className.includes("language-") &&
+      typeof children === "string"
+    ) {
+      return (
+        <div className="relative group my-4">
+          <pre {...props} />
+          <CopyButton text={children} />
+        </div>
+      );
+    }
+    return <pre {...props} />;
+  },
 };
 
 export function CustomMDX(props) {
