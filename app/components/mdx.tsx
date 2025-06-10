@@ -3,6 +3,13 @@ import Image from "next/image";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import React from "react";
 import { CopyButton } from "./code-copy-button";
+import { highlight } from "sugar-high";
+
+const Code = ({ children, ...props }) => {
+  let codeHTML = highlight(children);
+
+  return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />;
+};
 
 function Table({ data }) {
   let headers = data.headers.map((header, index) => (
@@ -97,6 +104,7 @@ let components = {
   h5: createHeading(5),
   h6: createHeading(6),
   Image: RoundedImage,
+  code: Code,
   a: CustomLink,
   Table,
   blockquote: Block,
