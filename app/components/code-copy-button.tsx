@@ -18,9 +18,9 @@ export const CopyButton = ({ text }) => {
   return (
     <button
       onClick={copyToClipboard}
-      className="absolute z-10 px-2  text-sm text-gray-500 transition-opacity bg-gray-100 rounded opacity-0 top-2 right-2 dark:bg-gray-700 hover:text-black dark:hover:text-white group-hover:opacity-100"
+      className="absolute z-10 px-2  text-sm text-gray-500 transition-opacity bg-gray-100 rounded opacity-0 top-2 right-2 dark:bg-gray-700 dark:text-gray-400 hover:text-black dark:hover:text-white group-hover:opacity-100"
     >
-      {copied ? "✔ Copied" : "📋 Copy"}
+      {copied ? "Copied" : "Copy"}
     </button>
   );
 };
