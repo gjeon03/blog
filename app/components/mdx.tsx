@@ -103,7 +103,7 @@ let components = {
   code: Code,
   Table,
   blockquote: Block,
-  pre: (props) => <pre className="relative group" {...props} />,
+  pre: (props) => <div {...props} />,
 };
 
 export function CustomMDX(props) {
