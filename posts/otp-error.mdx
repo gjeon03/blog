@@ -8,13 +8,13 @@ OTP 설정 이후에 아무리해서 외부에서 접근이 안됐습니다. 이
 
 ## **문제**
 
-- SSH 로그인 시 **OTP 코드 입력 후에도 계속 인증 실패** (`Invalid verification code`)
+- SSH 로그인 시 **OTP 코드 입력 후에도 계속 인증 실패** `Invalid verification code`
 - SSH 로그 확인 시 다음 오류 발생:
   ```bash
   Failed to read "/home/gyeongyeon/google_authenticator" for "gyeongyeon"
   No secret configured for user gyeongyeon, asking for code anyway.
   ```
-- 원인은 **Google Authenticator 설정 파일이 `root` 계정에만 존재**하고, SSH 로그인 계정(`gyeongyeon`)에는 파일이 없었기 때문.
+- 원인은 **Google Authenticator 설정 파일이 `root` 계정에만 존재**하고, SSH 로그인 계정`gyeongyeon`에는 파일이 없었기 때문.
 
 ### **SSH 인증 로그 확인**
 
