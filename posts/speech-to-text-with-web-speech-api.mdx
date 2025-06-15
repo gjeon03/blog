@@ -1,0 +1,320 @@
+---
+title: "Speech to Text with Web Speech API"
+publishedAt: "2025-06-16"
+summary: "Web Speech API의 SpeechRecognition 인터페이스를 활용해 브라우저에서 STT(Speech-to-Text) 기능을 구현한 예제와 핵심 개념을 정리합니다."
+tags: ["speech-recognition", "web-speech-api", "react", "typescript", "stt"]
+---
+
+# Web Speech API로 음성을 텍스트로 변환하기 (STT)
+
+이전에 사이드 프로젝트를 하면서 음성을 텍스트로 바꾸는 기능을 구현한 적이 있는데 브라우저만으로 이런 기능을 무료로 사용할 수 있다는게 재미있었고 당시 급하게 기능구현만 하느라 다시 한번 학습을 하고 싶었습니다.
+
+## Web Speech API - `SpeechRecognition` 인터페이스
+
+`SpeechRecognition`은 Web Speech API 중 하나로, 사용자의 음성을 텍스트로 변환하는 **STT(Speech-to-Text)** 기능을 제공합니다.
+
+이 인터페이스는 브라우저의 음성 인식 엔진을 제어하는 **컨트롤러 역할**을 하며, 인식 결과를 담은 `SpeechRecognitionEvent` 객체도 함께 처리합니다.
+
+> 📘 [MDN 설명](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition):
+>
+> “The `SpeechRecognition` interface of the Web Speech API is the controller interface for the recognition service; this also handles the `SpeechRecognitionEvent` sent from the recognition service.”
+
+### ⚠️ 브라우저 호환성 주의
+
+모든 브라우저에서 `SpeechRecognition`을 지원하는 것은 아닙니다.
+
+👉 [SpeechRecognition 브라우저 호환성 확인 (MDN)](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition#browser_compatibility)
+
+## TypeScript에서 사용할 때 주의할 점
+
+Web Speech API는 아직 공식적인 TypeScript 타입 정의가 포함되어 있지 않습니다. 과거에는 `@types/webspeechapi` 패키지를 설치하여 사용했던것 같은데 현재는 deprecated(더 이상 유지보수되지 않음) 상태로 그냥 사용하거나 따로 직접 타입을 선언해서 사용해야됩니다.
+
+Web Speech API 가 아직 일부 브라우저에서만 제한적으로 지원되고 있기 때문이 아닐까 싶습니다.
+
+```tsx
+npm install -D @types/webspeechapi
+```
+
+저는 `@types/webspeechapi` 패키지를 설치하여 테스트를 했습니다.
+
+# 구현하기
+
+## 1. VoiceRecorder
+
+```tsx
+//voice-recorder.tsx
+import {
+  SpeechRecognitionLanguage,
+  useSpeechRecognition,
+} from "@/hooks/use-speech-recognition";
+
+const languageOptions: { code: SpeechRecognitionLanguage; label: string }[] = [
+  { code: "ko-KR", label: "한국어" },
+  { code: "en-US", label: "English (US)" },
+  { code: "ja-JP", label: "日本語" },
+  { code: "zh-CN", label: "中文 (简体)" },
+  { code: "fr-FR", label: "Français" },
+  { code: "es-ES", label: "Español" },
+];
+
+export default function VoiceRecorder() {
+  const [lang, setLang] = useState<SpeechRecognitionLanguage>("ko-KR");
+  const {
+    transcript,
+    isListening,
+    startListening,
+    stopListening,
+    resetTranscript,
+  } = useSpeechRecognition({
+    lang,
+    onError: (event) => {
+      console.log("음성 인식 에러 발생:", event.error);
+    },
+  });
+
+  const handleToggleRecording = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const handleResetTranscript = () => {
+    resetTranscript();
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-screen gap-4 px-4 text-center">
+      <h1 className="text-2xl font-bold">Speech to Text</h1>
+
+      {/* 언어 선택 */}
+      <select
+        className="select border"
+        value={lang}
+        onChange={(e) => setLang(e.target.value as SpeechRecognitionLanguage)}
+        disabled={isListening}
+      >
+        {languageOptions.map(({ code, label }) => (
+          <option key={code} value={code}>
+            {label}
+          </option>
+        ))}
+      </select>
+
+      {/* 음성 인식 상태 표시 */}
+      <button
+        className={`px-4 py-2 text-white rounded cursor-pointer w-48 ${
+          isListening ? "bg-red-500" : "bg-blue-500"
+        }`}
+        onClick={handleToggleRecording}
+      >
+        {isListening ? "음성 인식 중지" : "음성 인식 시작"}
+      </button>
+
+      {/* STT 상태 표시 */}
+      <span className="text-sm text-gray-500">
+        {isListening ? "🎙️ 음성 인식 중..." : "🛑 음성 인식 대기 중"}
+      </span>
+
+      {/* 녹음 텍스트 */}
+      <div className="min-h-[4rem] mt-2 text-gray-700 whitespace-pre-line">
+        {transcript || "🎤 음성을 입력해보세요..."}
+      </div>
+
+      {/* 리셋 버튼 */}
+      <button
+        className="mt-2 px-3 py-1 text-sm text-gray-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
+        onClick={handleResetTranscript}
+        disabled={!transcript}
+      >
+        🧹 텍스트 지우기
+      </button>
+    </div>
+  );
+}
+```
+
+## 2. useSpeechRecognition.ts
+
+```tsx
+import { useRef, useState } from "react";
+
+export type SpeechRecognitionLanguage =
+  // 아시아
+  | "ko-KR" // 한국어 (대한민국)
+  | "ja-JP" // 일본어 (일본)
+  | "zh-CN" // 중국어 (중국 - 간체)
+  | "zh-TW" // 중국어 (대만 - 번체)
+  | "zh-HK" // 중국어 (홍콩 - 번체)
+  | "th-TH" // 태국어 (태국)
+  | "hi-IN" // 힌디어 (인도)
+  | "id-ID" // 인도네시아어 (인도네시아)
+  | "ms-MY" // 말레이어 (말레이시아)
+
+  // 유럽
+  | "en-GB" // 영어 (영국)
+  | "en-US" // 영어 (미국)
+  | "en-AU" // 영어 (호주)
+  | "en-CA" // 영어 (캐나다)
+  | "en-IN" // 영어 (인도)
+  | "de-DE" // 독일어 (독일)
+  | "fr-FR" // 프랑스어 (프랑스)
+  | "fr-CA" // 프랑스어 (캐나다)
+  | "it-IT" // 이탈리아어 (이탈리아)
+  | "es-ES" // 스페인어 (스페인)
+  | "es-MX" // 스페인어 (멕시코)
+  | "pt-BR" // 포르투갈어 (브라질)
+  | "pt-PT" // 포르투갈어 (포르투갈)
+  | "nl-NL" // 네덜란드어 (네덜란드)
+  | "ru-RU" // 러시아어 (러시아)
+  | "pl-PL" // 폴란드어 (폴란드)
+  | "sv-SE" // 스웨덴어 (스웨덴)
+  | "da-DK" // 덴마크어 (덴마크)
+  | "fi-FI" // 핀란드어 (핀란드)
+  | "no-NO" // 노르웨이어 (노르웨이)
+
+  // 아프리카 및 중동
+  | "ar-SA" // 아랍어 (사우디아라비아)
+  | "ar-EG" // 아랍어 (이집트)
+  | "tr-TR" // 터키어 (터키)
+  | "fa-IR" // 페르시아어 (이란)
+  | "he-IL" // 히브리어 (이스라엘)
+  | "af-ZA"; // 아프리칸스어 (남아프리카공화국)
+
+interface UseSpeechRecognitionOptions {
+  lang?: SpeechRecognitionLanguage;
+  onError?: (error: SpeechRecognitionError) => void;
+}
+
+export const useSpeechRecognition = ({
+  lang = "ko-KR",
+  onError,
+}: UseSpeechRecognitionOptions = {}) => {
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+
+  const startListening = () => {
+    if (
+      !("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
+    ) {
+      console.error("Speech recognition not supported");
+      return;
+    }
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = lang;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        }
+      }
+
+      if (finalTranscript) {
+        setTranscript((prev) => prev + finalTranscript);
+        console.log("Final result:", finalTranscript);
+      }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionError) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+      onError?.(event);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+    recognitionRef.current = recognition;
+  };
+
+  const stopListening = () => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  };
+
+  const resetTranscript = () => {
+    setTranscript("");
+  };
+
+  return {
+    isListening,
+    transcript,
+    startListening,
+    stopListening,
+    resetTranscript,
+  };
+};
+```
+
+# 핵심 포인트 정리
+
+### 1. continuous
+
+- `true`로 설정하면 끊기지 않고 계속 음성을 인식합니다.
+- 기본값은 `false`이며, 이 경우 사용자가 잠시 말을 멈추면 자동으로 인식이 종료됩니다.
+
+### 2. interimResults
+
+- `true`일 경우 중간 인식 결과(확정되지 않은 텍스트)도 받아올 수 있습니다.
+- 중간 결과는 `isFinal: false` 상태로 `event.results[i]`에 담겨 옵니다.
+
+### 3. lang
+
+- 인식할 언어 (예: `"ko-KR"`, `"en-US"`)
+
+### 4. onstart, onend
+
+- 인식 시작/종료 시점 콜백
+
+### 5. onresult
+
+- 음성 인식 결과 콜백
+- `event.results`는 이중 배열로 구성되며, 각 결과에는 `isFinal` 속성으로 최종 확정 여부가 표시
+
+### 6. onerror
+
+- 인식 실패 시 콜백
+
+### 7. start(), stop()
+
+- 인식 시작/정지 메서드
+
+## 특이사항
+
+하나 특이했던건 음성 인식이 일정시간 안되고 있으면 “no-speech” 라는 에러 메시지와 함께 음성 인식이 종료된다는 거였습니다. 이로인해 음성 인식과 동시에 녹음을 한다거나 음량 시각화를 표시할 경우엔 이 종료 시점을 함께 고려해야 될 거 같았습니다.
+
+# 작동 예제
+
+<iframe
+  src="https://codesandbox.io/embed/w6v524?view=preview&module=%2Fsrc%2FApp.tsx&hidenavigation=1"
+  style={{
+    width: "100%",
+    height: "500px",
+    border: "1px #000 solid",
+    borderRadius: "4px",
+    overflow: "hidden",
+  }}
+  title="speech-to-text"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+/>
+
+# Reference
+
+- [MDN SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition)
