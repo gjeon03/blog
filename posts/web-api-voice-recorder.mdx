@@ -1,0 +1,198 @@
+---
+title: "Web API로 음성 녹음 기능 만들기 (MediaRecorder 활용)"
+publishedAt: "2025-06-15"
+summary: "MediaRecorder를 활용한 웹 음성 녹음 기능 구현 예제와 Hook 기반의 활용법을 소개합니다."
+tags: ["media-recorder", "web-api", "react", "typescript"]
+---
+
+웹에서 음성을 녹음하고 파일로 저장하는 기능은 `MediaRecorder` API를 활용하면 비교적 간단하게 구현할 수 있습니다. React 기반 프로젝트에서 마이크 입력을 받아 녹음하고, 다운로드 가능한 오디오 파일로 만드는 흐름을 훅 형태로 정리해보겠습니다.
+
+---
+
+# 구현예시
+
+## 1. VoiceRecorder
+
+```tsx
+//voice-recorder.tsx
+import { useState } from "react";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
+import { downloadBlob } from "@/utils/download-blob";
+
+export default function VoiceRecorder() {
+  const [audioBlob, setAudioBlob] = useState<Blob>();
+  const { isRecording, startRecording, stopRecording } = useVoiceRecorder({
+    onComplete: (blob) => {
+      console.log("녹음 완료!", blob);
+      setAudioBlob(blob);
+    },
+  });
+
+  const handleDownload = () => {
+    if (audioBlob) {
+      downloadBlob(audioBlob, `voice-${Date.now()}.webm`);
+    }
+  };
+
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-screen gap-4 px-4 text-center">
+      <h1 className="text-2xl font-bold">Voice Recorder</h1>
+      <button
+        className={`px-4 py-2 text-white rounded cursor-pointer w-48 ${
+          isRecording ? "bg-red-500" : "bg-blue-500"
+        }`}
+        onClick={handleToggleRecording}
+      >
+        {isRecording ? "Stop" : "Start"} Recording
+      </button>
+      <button
+        className="px-3 py-1 bg-green-500 text-white rounded disabled:opacity-50"
+        onClick={handleDownload}
+        disabled={!audioBlob}
+      >
+        📥 다운로드
+      </button>
+    </div>
+  );
+}
+```
+
+## 2. useVoiceRecorder
+
+```tsx
+//use-voice-recorder.ts
+import { useRef, useState } from "react";
+
+export function useVoiceRecorder({
+  onComplete,
+}: {
+  onComplete: (blob: Blob) => void;
+}) {
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      console.error("getUserMedia not supported");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        onComplete(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone error", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  return {
+    isRecording,
+    startRecording,
+    stopRecording,
+  };
+}
+```
+
+## 3. downloadBlob
+
+```tsx
+//download-blob.ts
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }, 100);
+}
+```
+
+# 요약 설명
+
+### **1. Media Stream 요청**
+
+```tsx
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+```
+
+- 브라우저가 마이크 접근 권한을 요청하며, 이 스트림은 녹음에 사용됩니다.
+- video까지 녹음하려면 `{ video: true }`도 가능.
+
+### 2. **`MediaRecorder` 사용**
+
+- `MediaRecorder`는 `MediaStream`을 입력받아 오디오/비디오 녹음을 관리합니다.
+- `start()`, `stop()` 등의 메서드를 통해 녹음을 제어
+
+### 3. **`ondataavailable` 이벤트**
+
+- 녹음 중 일정 시간마다 또는 `stop()` 시점에 호출되는 이벤트
+- `recorder.start(1000)`으로 설정 시, 1초마다 데이터를 chunk 단위로 받을 수 있습니다.
+  - 실시간 스트리밍 처리, 대용량 데이터 나눠 저장, 음성 인식 등 실시간 처리 등에 사용
+
+### 4. **스트림 종료 처리**
+
+```tsx
+stream.getTracks().forEach((track) => track.stop());
+```
+
+- `mediaRecorder.stop()`만으로는 브라우저 상단의 마이크 사용 아이콘이 사라지지 않거나, 스트림이 계속 유지될 수 있습니다.
+- 따라서 명시적으로 마이크 트랙을 종료해주어 리소스를 해제합니다.
+
+# 작동 예제
+
+<iframe
+  src="https://codesandbox.io/embed/8fnl37?view=preview&module=%2Fsrc%2FApp.tsx&hidenavigation=1"
+  style={{
+    width: "100%",
+    height: "300px",
+    border: "1px #000 solid",
+    borderRadius: "4px",
+    overflow: "hidden",
+  }}
+  title="voice-input-check"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-downloads allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+/>
+
+# Reference
+
+- [MDN Using the MediaStream Recording API](https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API/Using_the_MediaStream_Recording_API)
+- [MDN MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder)
