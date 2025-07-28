@@ -64,6 +64,11 @@ export default function RootLayout({
             __html: `(${themeEffect.toString()})()`,
           }}
         />
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8200810878498210"
+          crossOrigin="anonymous"
+        ></script>
       </head>
       <body className="max-w-xl mx-4 mt-8 antialiased lg:mx-auto w-full">
         <main className="flex flex-col flex-auto min-w-0 px-2 mt-6 md:px-0">
