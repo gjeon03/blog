@@ -70,7 +70,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         ></script>
       </head>
-      <body className="max-w-xl mx-4 mt-8 antialiased lg:mx-auto w-full">
+      <body className="w-full max-w-4xl mx-4 mt-8 antialiased lg:mx-auto">
         <main className="flex flex-col flex-auto min-w-0 px-2 mt-6 md:px-0">
           <Navbar />
           {children}
