@@ -19,19 +19,26 @@ export default async function TagsPage() {
   );
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">All Tags</h1>
-      <ul className="space-y-2">
+    <section>
+      <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 mb-8">
+        All Tags
+      </h1>
+      <div className="flex flex-wrap gap-3">
         {sortedTags.map(([tag, count]) => (
-          <li key={tag}>
-            <Link href={`/tags/${tag}`}>
-              <span className="text-blue-600 hover:underline">
-                #{tag} ({count})
-              </span>
-            </Link>
-          </li>
+          <Link
+            key={tag}
+            href={`/tags/${tag}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors duration-200"
+          >
+            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+              #{tag}
+            </span>
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+              {count}
+            </span>
+          </Link>
         ))}
-      </ul>
-    </div>
+      </div>
+    </section>
   );
 }
