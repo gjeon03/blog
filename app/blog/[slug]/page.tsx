@@ -85,15 +85,14 @@ export default async function Blog({ params }) {
           }),
         }}
       />
-      <div className="mb-8 pb-8 border-b border-neutral-200 dark:border-neutral-800">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 mb-4 title">
+      <div className="pb-8 mb-8 border-b border-neutral-200 dark:border-neutral-800">
+        <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl text-neutral-900 dark:text-neutral-100 title">
           {post.metadata.title}
         </h1>
         <div className="flex items-center gap-4 text-sm text-neutral-500 dark:text-neutral-400">
           <time dateTime={post.metadata.publishedAt}>
             {formatDate(post.metadata.publishedAt)}
           </time>
-          <span>•</span>
           <Suspense fallback={<span>---</span>}>
             <ViewCount slug={post.slug} />
           </Suspense>
