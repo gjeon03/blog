@@ -19,19 +19,19 @@ export default async function TagsPage() {
   );
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">All Tags</h1>
-      <ul className="space-y-2">
+    <section>
+      <h1>All Tags</h1>
+      <ul style={{ listStyleType: 'disc', marginLeft: '20px', marginTop: '1em' }}>
         {sortedTags.map(([tag, count]) => (
-          <li key={tag}>
+          <li key={tag} style={{ marginBottom: '0.5em' }}>
             <Link href={`/tags/${tag}`}>
-              <span className="text-blue-600 hover:underline">
-                #{tag} ({count})
-              </span>
+              #{tag}
             </Link>
+            {" "}
+            <small style={{ color: '#666' }}>({count} post{count !== 1 ? 's' : ''})</small>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

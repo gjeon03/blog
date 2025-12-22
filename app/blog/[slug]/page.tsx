@@ -85,18 +85,18 @@ export default async function Blog({ params }) {
           }),
         }}
       />
-      <h1 className="text-2xl font-semibold tracking-tighter title">
-        {post.metadata.title}
-      </h1>
-      <div className="flex items-center justify-between mt-2 mb-8 text-sm">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {formatDate(post.metadata.publishedAt)}
-        </p>
-        <Suspense>
-          <ViewCount slug={post.slug} />
-        </Suspense>
+      <h1 className="title">{post.metadata.title}</h1>
+      <p style={{ fontSize: '12px', color: '#666', marginBottom: '1em' }}>
+        <i>
+          Published: {formatDate(post.metadata.publishedAt)}
+          {" | "}
+          <Suspense fallback={<span>Loading views...</span>}>
+            <ViewCount slug={post.slug} />
+          </Suspense>
+        </i>
         <IncrementViewCount slug={post.slug} />
-      </div>
+      </p>
+      <hr />
       <article className="prose">
         <CustomMDX source={post.content} />
       </article>

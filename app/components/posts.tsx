@@ -13,7 +13,7 @@ export function BlogPosts({ tag }: Props) {
   }
 
   return (
-    <div>
+    <ul style={{ listStyleType: 'disc', marginLeft: '20px', marginTop: '1em' }}>
       {allBlogs
         .sort((a, b) => {
           if (
@@ -24,21 +24,16 @@ export function BlogPosts({ tag }: Props) {
           return 1;
         })
         .map((post) => (
-          <Link
-            key={post.slug}
-            className="flex flex-col space-y-1 mb-4"
-            href={`/blog/${post.slug}`}
-          >
-            <div className="w-full flex flex-col md:flex-row space-x-0 md:space-x-2">
-              <p className="text-neutral-600 dark:text-neutral-400 w-[100px] tabular-nums">
-                {formatDate(post.metadata.publishedAt, false)}
-              </p>
-              <p className="text-neutral-900 dark:text-neutral-100 tracking-tight">
-                {post.metadata.title}
-              </p>
-            </div>
-          </Link>
+          <li key={post.slug} style={{ marginBottom: '0.5em' }}>
+            <Link href={`/blog/${post.slug}`}>
+              {post.metadata.title}
+            </Link>
+            {" "}
+            <small style={{ color: '#666' }}>
+              ({formatDate(post.metadata.publishedAt, false)})
+            </small>
+          </li>
         ))}
-    </div>
+    </ul>
   );
 }

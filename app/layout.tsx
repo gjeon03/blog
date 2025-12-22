@@ -53,7 +53,6 @@ export default function RootLayout({
     <html
       lang="en"
       className={cx(
-        "text-black bg-white dark:text-white dark:bg-black flex justify-center",
         GeistSans.variable,
         GeistMono.variable
       )}
@@ -70,8 +69,8 @@ export default function RootLayout({
           crossOrigin="anonymous"
         ></script>
       </head>
-      <body className="w-full max-w-4xl mx-4 mt-8 antialiased lg:mx-auto">
-        <main className="flex flex-col flex-auto min-w-0 px-2 mt-6 md:px-0">
+      <body className="max-w-3xl mx-auto p-4">
+        <main>
           <Navbar />
           {children}
           <Footer />

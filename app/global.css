@@ -3,156 +3,273 @@
 @tailwind utilities;
 
 ::selection {
-  background-color: #47a3f3;
-  color: #fefefe;
+  background-color: #000080;
+  color: #ffffff;
 }
 
 :root {
-  --sh-class: #2d5e9d;
-  --sh-identifier: #354150;
-  --sh-sign: #8996a3;
-  --sh-string: #007f7a;
-  --sh-keyword: #e02518;
-  --sh-comment: #a19595;
-  --sh-jsxliterals: #6266d1;
-  --sh-property: #e25a1c;
-  --sh-entity: #e25a1c;
+  --sh-class: #000080;
+  --sh-identifier: #000000;
+  --sh-sign: #000000;
+  --sh-string: #008000;
+  --sh-keyword: #0000ff;
+  --sh-comment: #808080;
+  --sh-jsxliterals: #800080;
+  --sh-property: #ff0000;
+  --sh-entity: #ff0000;
 }
 
 .dark {
-  --sh-class: #4c97f8;
-  --sh-identifier: white;
-  --sh-keyword: #f47067;
-  --sh-string: #0fa295;
+  --sh-class: #87ceeb;
+  --sh-identifier: #ffffff;
+  --sh-sign: #ffffff;
+  --sh-string: #00ff00;
+  --sh-keyword: #00ffff;
+  --sh-comment: #808080;
+  --sh-jsxliterals: #ff00ff;
+  --sh-property: #ffff00;
+  --sh-entity: #ffff00;
 
   color-scheme: dark;
 }
 
 html {
   min-width: 360px;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-.prose .anchor {
-  @apply absolute invisible no-underline;
-
-  margin-left: -1em;
-  padding-right: 0.5em;
-  width: 80%;
-  max-width: 700px;
-  cursor: pointer;
+body {
+  background-color: #ffffff;
+  color: #000000;
 }
 
-.anchor:hover {
-  @apply visible;
+.dark body {
+  background-color: #000000;
+  color: #c0c0c0;
 }
 
-.prose a {
-  @apply underline transition-all decoration-neutral-400 dark:decoration-neutral-600 underline-offset-2 decoration-[0.1em] break-all;
+/* 90s style links */
+a {
+  color: #0000ee;
+  text-decoration: underline;
 }
 
-.prose .anchor:after {
-  @apply text-neutral-300 dark:text-neutral-700;
-  content: "#";
+a:visited {
+  color: #551a8b;
 }
 
-.prose *:hover > .anchor {
-  @apply visible;
+a:active {
+  color: #ee0000;
 }
 
+.dark a {
+  color: #00ffff;
+}
+
+.dark a:visited {
+  color: #ff00ff;
+}
+
+.dark a:active {
+  color: #ffff00;
+}
+
+/* Headings - Times New Roman style */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Times New Roman", Times, serif;
+  font-weight: bold;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+h1 {
+  font-size: 2em;
+}
+
+h2 {
+  font-size: 1.5em;
+}
+
+h3 {
+  font-size: 1.17em;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #000000;
+  margin: 1em 0;
+}
+
+.dark hr {
+  border-top-color: #c0c0c0;
+}
+
+/* Table styling - classic 90s */
+table {
+  border-collapse: collapse;
+  border: 2px solid #000000;
+  background-color: #ffffff;
+}
+
+.dark table {
+  border-color: #c0c0c0;
+  background-color: #000000;
+}
+
+table th,
+table td {
+  border: 1px solid #000000;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.dark table th,
+.dark table td {
+  border-color: #c0c0c0;
+}
+
+table th {
+  background-color: #c0c0c0;
+  font-weight: bold;
+}
+
+.dark table th {
+  background-color: #333333;
+}
+
+/* Code blocks - simple pre style */
 .prose pre {
-  @apply px-3 py-2 overflow-x-auto text-sm border rounded-lg bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700;
+  background-color: #f0f0f0;
+  border: 1px solid #000000;
+  padding: 10px;
+  overflow-x: auto;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 12px;
+}
+
+.dark .prose pre {
+  background-color: #1a1a1a;
+  border-color: #c0c0c0;
+  color: #00ff00;
 }
 
 .prose code {
-  @apply px-1 py-0.5 rounded-lg text-black dark:text-gray-100;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 12px;
+  background-color: #f0f0f0;
+  padding: 2px 4px;
+}
+
+.dark .prose code {
+  background-color: #1a1a1a;
+  color: #00ff00;
 }
 
 .prose pre code {
-  @apply p-0;
-  border: initial;
-  line-height: 1.5;
+  background-color: transparent;
+  padding: 0;
 }
 
-.prose code span {
-  @apply font-medium;
-}
-
-.prose img {
-  /* Don't apply styles to next/image */
-  @apply m-0;
+/* Prose content */
+.prose {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .prose p {
-  @apply my-4 whitespace-pre-line text-neutral-800 dark:text-neutral-200;
+  margin: 1em 0;
 }
 
-.prose h1 {
-  @apply mt-6 mb-2 text-4xl font-medium tracking-tight;
+.prose a {
+  color: #0000ee;
+  text-decoration: underline;
 }
 
-.prose h2 {
-  @apply mt-6 mb-2 text-xl font-medium tracking-tight;
+.prose a:visited {
+  color: #551a8b;
 }
 
-.prose h3 {
-  @apply mt-6 mb-2 text-xl font-medium tracking-tight;
+.dark .prose a {
+  color: #00ffff;
 }
 
-.prose h4 {
-  @apply mt-6 mb-2 text-lg font-medium tracking-tight;
-}
-
-.prose strong {
-  @apply font-medium;
+.dark .prose a:visited {
+  color: #ff00ff;
 }
 
 .prose ul {
-  @apply pl-6 list-disc;
+  list-style-type: disc;
+  margin-left: 40px;
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 
 .prose ol {
-  @apply pl-6 list-decimal;
+  list-style-type: decimal;
+  margin-left: 40px;
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 
-.prose > :first-child {
-  /* Override removing top margin, causing layout shift */
-  margin-top: 1.25em !important;
-  margin-bottom: 1.25em !important;
+.prose img {
+  border: 2px solid #000000;
+  margin: 10px 0;
 }
 
-pre::-webkit-scrollbar {
-  display: none;
+.dark .prose img {
+  border-color: #c0c0c0;
 }
 
-pre {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+.prose blockquote {
+  margin: 1em 40px;
+  font-style: italic;
+  color: #333333;
 }
 
-/* Remove Safari input shadow on mobile */
-input[type="text"],
-input[type="email"] {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
+.dark .prose blockquote {
+  color: #aaaaaa;
 }
 
-table {
-  display: block;
-  max-width: fit-content;
-  overflow-x: auto;
-  white-space: nowrap;
+.prose strong,
+.prose b {
+  font-weight: bold;
+}
+
+.prose em,
+.prose i {
+  font-style: italic;
+}
+
+/* Anchor links */
+.prose .anchor {
+  position: absolute;
+  visibility: hidden;
+  text-decoration: none;
+  margin-left: -1em;
+  padding-right: 0.5em;
+  cursor: pointer;
+}
+
+.prose .anchor:after {
+  content: "#";
+  color: #808080;
+}
+
+.prose *:hover > .anchor {
+  visibility: visible;
 }
 
 .title {
   text-wrap: balance;
 }
 
-.block > h1,
-.block > h2,
-.block > h3,
-.block > h4,
-.block > h5,
-.block > h6 {
-  margin-top: 0px;
+/* Remove default margins for first child in blocks */
+.block > h1:first-child,
+.block > h2:first-child,
+.block > h3:first-child,
+.block > h4:first-child,
+.block > h5:first-child,
+.block > h6:first-child {
+  margin-top: 0;
 }
