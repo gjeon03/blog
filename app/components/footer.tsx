@@ -17,45 +17,38 @@ function ArrowIcon() {
 
 export default function Footer() {
   return (
-    <footer className="mb-16">
-      <ul className="font-sm mt-8 flex flex-col space-x-0 space-y-2 text-neutral-600 md:flex-row md:space-x-4 md:space-y-0 dark:text-neutral-300">
-        <li>
+    <footer className="mt-16 pt-8 border-t border-neutral-200 dark:border-neutral-800">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          © {new Date().getFullYear()} MIT Licensed
+        </p>
+        <div className="flex gap-6">
           <a
-            className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
+            className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-200"
             rel="noopener noreferrer"
             target="_blank"
             href="/rss"
           >
-            <ArrowIcon />
-            <p className="ml-2 h-7">rss</p>
+            RSS
           </a>
-        </li>
-        <li>
           <a
-            className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
+            className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-200"
             rel="noopener noreferrer"
             target="_blank"
             href="https://github.com/gjeon03"
           >
-            <ArrowIcon />
-            <p className="ml-2 h-7">github</p>
+            GitHub
           </a>
-        </li>
-        <li>
           <a
-            className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
+            className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-200"
             rel="noopener noreferrer"
             target="_blank"
             href="https://github.com/gjeon03/blog"
           >
-            <ArrowIcon />
-            <p className="ml-2 h-7">view source</p>
+            Source
           </a>
-        </li>
-      </ul>
-      <p className="mt-8 text-neutral-600 dark:text-neutral-300">
-        © {new Date().getFullYear()} MIT Licensed
-      </p>
+        </div>
+      </div>
     </footer>
   );
 }

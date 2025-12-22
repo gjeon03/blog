@@ -23,9 +23,20 @@ export default async function TagPage({ params }: Props) {
   const filtered = posts.filter((p) => p.metadata.tags?.includes(tag));
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Posts tagged with #{tag}</h1>
-      {filtered.length === 0 ? <p>No posts found.</p> : <BlogPosts tag={tag} />}
-    </div>
+    <section>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 mb-2">
+          Posts tagged with #{tag}
+        </h1>
+        <p className="text-neutral-500 dark:text-neutral-400">
+          {filtered.length} {filtered.length === 1 ? 'post' : 'posts'}
+        </p>
+      </div>
+      {filtered.length === 0 ? (
+        <p className="text-neutral-500 dark:text-neutral-400">No posts found.</p>
+      ) : (
+        <BlogPosts tag={tag} />
+      )}
+    </section>
   );
 }

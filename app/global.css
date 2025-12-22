@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 ::selection {
-  background-color: #47a3f3;
-  color: #fefefe;
+  background-color: #3b82f6;
+  color: #ffffff;
 }
 
 :root {
@@ -60,11 +60,13 @@ html {
 }
 
 .prose pre {
-  @apply px-3 py-2 overflow-x-auto text-sm border rounded-lg bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700;
+  @apply px-4 py-3 overflow-x-auto text-sm border rounded-xl bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
 }
 
 .prose code {
-  @apply px-1 py-0.5 rounded-lg text-black dark:text-gray-100;
+  @apply px-1.5 py-0.5 rounded-md text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800;
+  font-size: 0.9em;
 }
 
 .prose pre code {
