@@ -1,6 +1,9 @@
 ## Type
 - [x] Chore / Refactor
 
+## Related Issue
+<!-- Closes #이슈번호 -->
+
 ## Summary
 - <!-- 한 줄 -->
 

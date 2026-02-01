@@ -1,6 +1,9 @@
 ## Type
 - [x] Code / Site Change
 
+## Related Issue
+<!-- Closes #이슈번호 -->
+
 ## Summary
 - <!-- 변경 내용 한 줄 -->
 

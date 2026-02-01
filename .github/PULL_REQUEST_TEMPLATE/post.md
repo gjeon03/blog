@@ -1,6 +1,9 @@
 ## Type
 - [x] Post / Content
 
+## Related Issue
+<!-- Closes #이슈번호 -->
+
 ## Summary
 - <!-- 이 PR의 목적 한 줄 -->
 
