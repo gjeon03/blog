@@ -1,14 +1,14 @@
 ---
-title: "moltbot(clawdbot)의 자가 진단"
+title: "openclaw의 자가 진단"
 publishedAt: "2026-02-01"
 summary: "Slack 발송 이슈를 겪으면서 'AI가 스스로 문제를 해석하는 순간'을 봤다"
-tags: ["clawdbot", "moltbot", "slack", "self-diagnosis", "automation", "ai"]
+tags: ["openclaw", "slack", "self-diagnosis", "automation", "ai"]
 ---
 
-moltbot(clawdbot)을 써보면서 가장 먼저 느낀 건, "자동화가 이렇게까지 쉽게 되나?"였습니다.
-miniPC에 moltbot을 설치해 Telegram으로 대화하며 AI 기사 요약을 정기 발송하도록 설정했고, Telegram에서는 안정적으로 잘 동작했습니다.
+openclaw을 써보면서 가장 먼저 느낀 건, "자동화가 이렇게까지 쉽게 되나?"였습니다.
+miniPC에 openclaw을 설치해 Telegram으로 대화하며 AI 기사 요약을 정기 발송하도록 설정했고, Telegram에서는 안정적으로 잘 동작했습니다.
 
-![01-telegram-daly-message.png](/posts/moltbot-self-diagnosis/01-telegram-daly-message.png)
+![01-telegram-daly-message.png](/posts/openclaw-self-diagnosis/01-telegram-daly-message.png)
 
 문제는 동료들과 공유하려고 Slack 채널로 전환한 뒤부터였습니다.
 특정 시점에 gateway 프로세스가 종료되면서 메시지가 누락되는 일이 생겼고, 이게 "항상"이 아니라 "가끔" 발생해서 원인 파악이 더 어려웠습니다.
@@ -20,20 +20,20 @@ miniPC에 moltbot을 설치해 Telegram으로 대화하며 AI 기사 요약을 �
 가장 먼저 한 일은 로그 확인이었습니다.
 
 ```bash
-journalctl --user -u clawdbot-gateway.service -f -o cat
+journalctl --user -u openclaw-gateway.service -f -o cat
 ```
 
 여기서 다음과 같은 단서를 확인할 수 있었습니다.
 
 - `Config invalid`
 - `Unrecognized key: "tools"`
-- 로그에 안내된 조치: `clawdbot doctor --fix`
+- 로그에 안내된 조치: `openclaw doctor --fix`
 - 서비스 재시작 반복(restart counter 증가)
 
-![02-clawdbot-error-log.png](/posts/moltbot-self-diagnosis/02-clawdbot-error-log.png)
+![02-clawdbot-error-log.png](/posts/openclaw-self-diagnosis/02-clawdbot-error-log.png)
 (로그 확인을 좀 늦게 했더니 재실행 카운터가 엄청 쌓여있었습니다😂)
 
-로그에 나와있는대로 `clawdbot doctor --fix`를 실행하면 일시적으로 정상처럼 보였습니다.
+로그에 나와있는대로 `openclaw doctor --fix`를 실행하면 일시적으로 정상처럼 보였습니다.
 
 ## 문제의 본질은 "복구"가 아니라 "재발"이었다
 
@@ -48,13 +48,13 @@ journalctl --user -u clawdbot-gateway.service -f -o cat
 
 같은 질문으로 바뀌었습니다.
 
-(저는 moltbot에게 저를 ‘전하’라고 부르라고 했습니다 😆)
-![03-report-problem.png](/posts/moltbot-self-diagnosis/03-report-problem.png)
-⬆️ 직전 대화는 moltbot이 꺼지는 문제가 있어서, AI 관련 기사/포럼 수집을 n8n으로 바꿀지 고민하며 나눈 이야기였습니다.
+(저는 openclaw에게 저를 '전하'라고 부르라고 했습니다 😆)
+![03-report-problem.png](/posts/openclaw-self-diagnosis/03-report-problem.png)
+⬆️ 직전 대화는 openclaw이 꺼지는 문제가 있어서, AI 관련 기사/포럼 수집을 n8n으로 바꿀지 고민하며 나눈 이야기였습니다.
 자기가 꺼지는 상황은 PC가 꺼지거나 절전 모드(sleep) 들어가면 이라면서 n8n도 같은 환경에 올리는거면 똑같다고 계속 답을 하더라고요🤣
 
-![04-doctor-fix-recurs.png](/posts/moltbot-self-diagnosis/04-doctor-fix-recurs.png)
-![05-doctor-repair-diagnosis.png](/posts/moltbot-self-diagnosis/05-doctor-repair-diagnosis.png)
+![04-doctor-fix-recurs.png](/posts/openclaw-self-diagnosis/04-doctor-fix-recurs.png)
+![05-doctor-repair-diagnosis.png](/posts/openclaw-self-diagnosis/05-doctor-repair-diagnosis.png)
 
 ---
 
@@ -96,4 +96,21 @@ AI가 단순히 결과를 만들어주는 것을 넘어,
 AI가 먼저 "무슨 문제가 일어난 건지"를 해석하고 복구 방향을 잡는 형태로
 점점 자연스럽게 넘어갈지도 모르겠습니다.
 
-![06-last-message.png](/posts/moltbot-self-diagnosis/06-last-message.png)
+![06-last-message.png](/posts/openclaw-self-diagnosis/06-last-message.png)
+
+---
+
+## 이름 바뀌더니 텔레그램도 끊겼다
+
+글을 마무리하려는데, openclaw이 clawdbot → moltbot → openclaw로 이름이 바뀌었습니다.
+업데이트 돌렸더니 이번엔 Telegram이 먹통이 됐어요.
+
+그래서 그냥 물어봤습니다.
+
+"텔레그램 연결된 거 맞아? 메시지 보내도 받지를 못하는데?"
+
+그랬더니 얘가 알아서 설정 뒤적거리더니 "연결 완료됐습니다" 하고 끝.
+명령어 하나 안 쳤는데요? 그냥 투덜댔을 뿐인데 알아서 고쳐버렸습니다😱
+
+![07-check-telegram.png](/posts/openclaw-self-diagnosis/07-check-telegram.png)
+![08-telegram-fixed.png](/posts/openclaw-self-diagnosis/08-telegram-fixed.png)
